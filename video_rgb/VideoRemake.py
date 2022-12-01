@@ -270,9 +270,9 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, searc
             # if dx != 0 or dy != 0:
             #     print(y,x, match_y,match_x,dy,dx,SAD, indices, search_area.shape)
             matrix[y//block_size][x//block_size] = [dy , dx]
-            predicted[y:y+block_size, x:x+block_size] = frame_being_searched[match_y:match_y+block_size, match_x:match_x+block_size]
+            # predicted[y:y+block_size, x:x+block_size] = frame_being_searched[match_y:match_y+block_size, match_x:match_x+block_size]
 
-    # return matrix
+    return matrix
     residualFrame = residual(frame_base, predicted)
 
     outfile="OUTPUT"
