@@ -12,6 +12,8 @@ import java.lang.Math;
 // import java.lang.*;
 // import org.opencv.imgproc.Imgproc;
 
+import org.opencv.core.Mat;
+
 public class VideoRemake {
 
 	JFrame frame;
@@ -237,19 +239,26 @@ public class VideoRemake {
 
 		String actualFilePath;
 
-		byte[] currentFrame = new byte[frameLength];
+		byte[][] currentFrame = new byte[frameNumber][frameLength];
 
+		// read to currentFrame
 		for (int i = 0; i < frameNumber; i++) {
 			// [001, frameNumber]
 			actualFilePath = String.format("%s%03d.rgb", imgPathComponent1, i + 1);
 			// System.out.println(actualForegroundPath);
+			currentFrame[i] = readAnImageRGB(width, height, actualFilePath);
+		}
+
+		for (int i = 0; i < frameNumber - 1; i++) {
+
+		}
+
+		// load to buffer
+		for (int i = 0; i < frameNumber; i++) {
 			// just initialize buffer
 			processedImgBuffer[i] = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-			// all inplace
-			currentFrame = readAnImageRGB(width, height, actualFilePath);
 
-			loadByteArrToBuffer(currentFrame, processedImgBuffer[i]);
-
+			loadByteArrToBuffer(currentFrame[i], processedImgBuffer[i]);
 		}
 
 		lbIm1List = new JLabel[frameNumber];
