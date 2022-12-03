@@ -33,7 +33,8 @@ if __name__ == "__main__":
     # runJavaRGB2PNG(parent_dict, main_folder)
 
     block_size = 16
-    frame_predict_step = 3
+    search_expand_length = 8
+    frame_predict_step = 1
     for frame_idx_0 in range(frame_num-frame_predict_step):
         print("calculating motion vector" + str(frame_idx_0))
         frame_idx_1 = frame_idx_0 + frame_predict_step
@@ -43,6 +44,6 @@ if __name__ == "__main__":
         frame_n1 = cv2.imread(frame_idx_1_path)
         frame_n0_Y_blockized = preprocess_a_frame(frame_n0, block_size)
         frame_n1_Y_blockized = preprocess_a_frame(frame_n1, block_size)
-        motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, 8)
+        motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, search_expand_length, True)
         draw_line_on_predicted(predicted, motion_vector_matrix, block_size)
-        # save_intermediate_images(frame_n1_Y_blockized, predicted, idx = frame_idx_0)
+        save_intermediate_images(frame_n1_Y_blockized, predicted, idx = frame_idx_0)

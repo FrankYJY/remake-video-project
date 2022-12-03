@@ -242,11 +242,13 @@ def get_search_area(x, y, frame, block_size, search_expand_length):
     search_area = frame[sy:min(y+search_expand_length+block_size, h), sx:min(x+search_expand_length+block_size, w)]
     return search_area, [sy, min(y+search_expand_length+block_size, h), sx, min(x+search_expand_length+block_size, w)]
 
-def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, search_expand_length=16):
+def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, search_expand_length=16, if_generate_predict_frames = False):
     #                            frame n             frame n+1                search_expand_length must be multiple of block_size
     # search  frame_base n+1       in     frame_being_searched n
     h, w = frame_being_searched.shape
-    predicted = np.ones((h, w))*255
+    predicted = None
+    if if_generate_predict_frames:
+        predicted = np.ones((h, w))*255
     blockized_h, blockized_w = get_blockized_height_width(frame_being_searched, block_size)
     bcount = 0
     matrix = [[None for i in range(w//block_size)] for j in range(h//block_size)]
@@ -294,7 +296,8 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, searc
 
             # motion points from n to n+1
             matrix[y//block_size][x//block_size] = motion_vectors
-            predicted[y:y+block_size, x:x+block_size] = frame_being_searched[match_y:match_y+block_size, match_x:match_x+block_size]
+            if if_generate_predict_frames:
+                predicted[y:y+block_size, x:x+block_size] = frame_being_searched[match_y:match_y+block_size, match_x:match_x+block_size]
 
     # assert bcount == int(blockized_h / block_size * blockized_w / block_size) #check all macroblocks are accounted for
     return matrix, predicted
