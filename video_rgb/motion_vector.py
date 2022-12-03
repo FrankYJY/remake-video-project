@@ -16,16 +16,17 @@ def BGR2YCrCb(image):
 def get_blockized_height_width(frame, block_size):
     # frame need to be 2d
     # cut out edge here
-    h, w = frame.shape
-    h_block_num = int(h / block_size)
-    w_block_num = int(w / block_size)
+    # h, w = frame.shape
+    h_block_num = int(frame.shape[0] / block_size)
+    w_block_num = int(frame.shape[1] / block_size)
     return h_block_num * block_size, w_block_num * block_size
 
 
-def preprocess_a_frame(frame_path_or_ndarray, block_size):
+def preprocess_a_frame_to_Y(frame_path_or_ndarray, block_size):
     # get luminosity and blockize
 
     if isinstance(frame_path_or_ndarray, str):
+        # should be rgb to yuv, but y is same
         frame_Y = BGR2YCrCb(cv2.imread(frame_path_or_ndarray))[:, :, 0] # get luminosity
 
     elif isinstance(frame_path_or_ndarray, np.ndarray):
@@ -39,6 +40,21 @@ def preprocess_a_frame(frame_path_or_ndarray, block_size):
     frame_Y_blockized = cv2.resize(frame_Y, (blockized_w, blockized_h))
 
     return frame_Y_blockized
+
+def preprocess_a_frame_size(frame_path_or_ndarray, block_size):
+    # get luminosity and blockize
+
+    if isinstance(frame_path_or_ndarray, str):
+        # should be rgb to yuv, but y is same
+        frame_path_or_ndarray = cv2.imread(frame_path_or_ndarray)
+    elif isinstance(frame_path_or_ndarray, np.ndarray):
+        pass
+    else:
+        raise ValueError
+
+    #resize frame to fit segmentation
+    blockized_h, blockized_w = get_blockized_height_width(frame_path_or_ndarray, block_size)
+    return cv2.resize(frame_path_or_ndarray, (blockized_w, blockized_h))
 
 def getBlockZone(coord, search_area, block, block_size):
     px, py = coord # coordinates of macroblock center
@@ -99,7 +115,7 @@ def TSS(block, search_area, block_size, search_expand_length): #3 Step Search
 def hierarchical_search(base_block, area_to_searched, block_size, search_expand_length, max_best_candidates_per_level = 1, best_candidates_SAD_no_bigger_than_minSAD_tolerate_range = 500):
     # modified
     #                                                      n must be 2^x            k                                              if set tolerate range, need to set for each level
-    # the return is based on frame_being_searched left_top_corner, matrix is [y][x][candidate idx][0:dy 1:x]
+    # the return is based on frame_being_searched left_top_corner, matrix is [[dx0,dy0][dx1,dy1]...] [candidate idx][0:dy 1:x]
     def maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate):
         if candidates_SAD_max[0] == 0:
             # cache is filled with SAE=0 candidates, do not insert
@@ -268,11 +284,11 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, searc
             # best_matches is not the motion vector, is based on clipped search area
             best_matches, SAD = hierarchical_search(base_block, search_area, block_size, search_expand_length, max_best_candidates_per_level)
 
-            # print(SAD//(block_size*block_size)) # this is MAD
+            MAD = SAD//(block_size*block_size) # this is MAD
 
-            # # multiple candidates usually adjacent, take average
-            # if len(best_matches) > 1:
-            #     # print("multiple best candidates", SAD, best_matches)
+            # multiple candidates usually adjacent, take average
+            if len(best_matches) > 1:
+                print("multiple best candidates", SAD, best_matches)
             #     temp0 = 0
             #     temp1 = 0
             #     templ = len(best_matches)
@@ -283,6 +299,7 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, searc
             #     avg_coord2 = temp1//templ
             #     best_matches[0] = (avg_coord1, avg_coord2)
     
+
             motion_vectors = []
             for best_match in best_matches:
                 match_relative_y, match_relative_x = best_match
@@ -292,9 +309,10 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, searc
                 dy = y - match_y
                 # if dx != 0 or dy != 0:
                 #     print(y,x, match_y,match_x,dy,dx,SAD, indices, search_area.shape)
-                motion_vectors.append([dy , dx])
+                motion_vectors.append([dy , dx, MAD])
 
             # motion points from n to n+1
+            # [y][x][candidate idx][0:dy 1:x]
             matrix[y//block_size][x//block_size] = motion_vectors
             if if_generate_predict_frames:
                 predicted[y:y+block_size, x:x+block_size] = frame_being_searched[match_y:match_y+block_size, match_x:match_x+block_size]
@@ -302,7 +320,7 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, searc
     # assert bcount == int(blockized_h / block_size * blockized_w / block_size) #check all macroblocks are accounted for
     return matrix, predicted
 
-def save_intermediate_images(frame_base, predicted, intermediate_output_dict="OUTPUT", idx = None):
+def save_intermediate_images(frame_base, predicted, intermediate_output_dict="OUTPUT", idx = -1):
     residualFrame = residual(frame_base, predicted)
 
     
@@ -311,7 +329,7 @@ def save_intermediate_images(frame_base, predicted, intermediate_output_dict="OU
         os.mkdir(intermediate_output_dict)
 
 
-    if idx:
+    if idx!= -1:
         # cv2.imwrite(f"{outfile}/targetFrame.png", targetFrame)
         cv2.imwrite(f"{intermediate_output_dict}/predictedFrame"+"{:03d}".format(idx)+".png", predicted)
         cv2.imwrite(f"{intermediate_output_dict}/residualFrame"+"{:03d}".format(idx)+".png", residualFrame)
@@ -333,7 +351,7 @@ def draw_line_on_predicted(predicted, motion_vector_matrix, block_size):
     for vector_y in range(len(motion_vector_matrix)):
         for vector_x in range(len(motion_vector_matrix[0])):
             for motion_vector_matrix_pair in motion_vector_matrix[vector_y][vector_x]:
-                dy, dx = motion_vector_matrix_pair
+                dy, dx = motion_vector_matrix_pair[0], motion_vector_matrix_pair[1]
                 # x01y01just for calculate (x0, y0) (x1, y1)
                 y0 = block_y = vector_y*block_size + block_size//2 # center
                 x0 = block_x = vector_x*block_size + block_size//2
@@ -364,3 +382,33 @@ def draw_line_on_predicted(predicted, motion_vector_matrix, block_size):
                     if error < 0:
                         y += ystep
                         error += deltax
+
+# data refine
+def motion_vector_candidates_set_min_length_to_candidate_idx_0_inplace(motion_vector_matrix):
+    for vector_y in range(len(motion_vector_matrix)):
+        for vector_x in range(len(motion_vector_matrix[0])):
+            candidate_num = len(motion_vector_matrix[vector_y][vector_x])
+            if  candidate_num > 1:
+                motion_vector_matrix_candidate = motion_vector_matrix[vector_y][vector_x][0]
+                min_pair_length = motion_vector_matrix_candidate[0] + motion_vector_matrix_candidate[1]
+                for i in range(1, candidate_num):
+                    motion_vector_matrix_candidate = motion_vector_matrix[vector_y][vector_x][i]
+                    pair_length = motion_vector_matrix_candidate[0] + motion_vector_matrix_candidate[1]
+                    if pair_length < min_pair_length:
+                        min_pair_length = pair_length
+                        motion_vector_matrix[vector_y][vector_x][0] = motion_vector_matrix_candidate
+
+
+def make_cluster_dataset_of_motion_vectors(motion_vector_matrix):
+    cluster_data = []
+    motion_vector_xy_to_idx = dict()
+    i = 0
+    for vector_y in range(len(motion_vector_matrix)):
+        for vector_x in range(len(motion_vector_matrix[0])):
+            motion_vector_matrix_candidate = motion_vector_matrix[vector_y][vector_x][0] # first candidate
+            cluster_data.append([motion_vector_matrix_candidate[0], motion_vector_matrix_candidate[1]])
+            # cluster_data.append(motion_vector_matrix_candidate)
+            motion_vector_xy_to_idx[(vector_y, vector_x)] = i
+            i += 1
+    
+    return cluster_data, motion_vector_xy_to_idx

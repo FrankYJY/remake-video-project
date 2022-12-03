@@ -7,6 +7,7 @@ from kneed import KneeLocator
 from sklearn.datasets import make_blobs
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+from collections import Counter
 
 
 def cluster(points,eps=0.3):
@@ -17,30 +18,32 @@ def cluster(points,eps=0.3):
     '''
     features = points
     scaler = StandardScaler()
-    scaled_features = scaler.fit_transform(features)
-
+    #scaled_features = scaler.fit_transform(features)
+    # plt.scatter([item[0] for item in features],[item[1] for item in features],label="stars")
+    # plt.show()
+    scaled_features =features 
     # Instantiate k-means and dbscan algorithms
-    #kmeans = KMeans(n_clusters=2)
+    kmeans = KMeans(n_clusters=2, init = 'k-means++')
     dbscan = DBSCAN(eps=eps)
 
     # Fit the algorithms to the features
-    #kmeans.fit(scaled_features)
+    kmeans.fit(scaled_features)
     dbscan.fit(scaled_features)
 
     # Compute the silhouette scores for each algorithm
-    '''
+    
     kmeans_silhouette = silhouette_score(
         scaled_features, kmeans.labels_
     ).round(2)
-    '''
-    dbscan_silhouette = silhouette_score(
-    scaled_features, dbscan.labels_
-    ).round (2)
+    
+    # dbscan_silhouette = silhouette_score(
+    # scaled_features, dbscan.labels_
+    # ).round (2)
 
-    print(features)
-    print(dbscan.labels_)
-    return dbscan.labels_
-    '''
+    # print(features)
+    # print(dbscan.labels_)
+    
+    ''''
     # Plot the data and cluster silhouette comparison
     fig, (ax1, ax2) = plt.subplots(
         1, 2, figsize=(8, 6), sharex=True, sharey=True
@@ -52,17 +55,34 @@ def cluster(points,eps=0.3):
     }
     # The k-means plot
     km_colors = [fte_colors[label] for label in kmeans.labels_]
-    ax1.scatter(scaled_features[:, 0], scaled_features[:, 1], c=km_colors)
+    ax1.scatter(scaled_features[:][0], scaled_features[:][1], c=km_colors)
     ax1.set_title(
         f"k-means\nSilhouette: {kmeans_silhouette}", fontdict={"fontsize": 12}
     )
 
     # The dbscan plot
+    
     db_colors = [fte_colors[label] for label in dbscan.labels_]
     ax2.scatter(scaled_features[:, 0], scaled_features[:, 1], c=db_colors)
     ax2.set_title(
         f"DBSCAN\nSilhouette: {dbscan_silhouette}", fontdict={"fontsize": 12}
     )
+    
     plt.show()
-    input()
     '''
+    return kmeans.labels_
+
+def get_cluster_labels_descending(cluster_labels):
+    cluster_labels_counts = Counter(cluster_labels)
+    cluster_labels_counts_list = []
+    for key in cluster_labels_counts:
+        cluster_labels_counts_list.append([key, cluster_labels_counts[key]])
+    cluster_labels_counts_list.sort(key = lambda x: x[1], reverse=True)
+    # max_cluster_labels_counter_val = 0
+
+    # for key in cluster_labels_counter:
+    #     if max_cluster_labels_counter_val < cluster_labels_counter[key]:
+    #         max_cluster_labels_counter_val = cluster_labels_counter[key]
+    #         bkg_label = key
+    # print(cluster_labels_counter, bkg_label)
+    return cluster_labels_counts_list

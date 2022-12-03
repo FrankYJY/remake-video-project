@@ -33,7 +33,8 @@ def convert_bgra_2_video(arr, fps):
 
 
 if __name__ == "__main__":
-    video_path = "/Users/zihao/Documents/GitHub/remake-video-project/video_view/video2.mp4"
+    # video_path = "/Users/zihao/Documents/GitHub/remake-video-project/video_view/video2.mp4"
+    video_path = "C:\\Users\\14048\\Desktop\\multimedia\\project\\video_view/video2.mp4"
     arr,fps = convert_video_2_bgra(video_path)
     print(fps)
     convert_bgra_2_video(arr, fps)

@@ -323,7 +323,8 @@ public class VideoRemake {
 		String parentDict = "C:\\Users\\14048\\Desktop\\multimedia\\project\\video_rgb\\"; // yjy's
 		// String parentDict = "C:/Users/14048/Desktop/multimedia/project/video_rgb/";
 		// // yjy's
-		String folder = "SAL_490_270_437";
+//		String folder = "SAL_490_270_437";
+		String folder = "video2_240_424_383";
 		// String folder = "Stairs_490_270_346";
 		// String folder = "video1_240_424_518";
 		// String folder = "video2_240_424_383";
