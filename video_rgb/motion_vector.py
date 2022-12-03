@@ -99,7 +99,7 @@ def TSS(block, search_area, block_size, search_expand_length): #3 Step Search
 def hierarchical_search(base_block, area_to_searched, block_size, search_expand_length, max_best_candidates_per_level = 1, best_candidates_SAD_no_bigger_than_minSAD_tolerate_range = 500):
     # modified
     #                                                      n must be 2^x            k                                              if set tolerate range, need to set for each level
-    # the return is based on frame_being_searched left_top_corner
+    # the return is based on frame_being_searched left_top_corner, matrix is [y, x, [[dy,dx],[dy,dx]...]   ]
     def maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate):
         if candidates_SAD_max[0] == 0:
             # cache is filled with SAE=0 candidates, do not insert
@@ -134,8 +134,8 @@ def hierarchical_search(base_block, area_to_searched, block_size, search_expand_
 
     frame_height, frame_width = area_to_searched.shape
     # print(frame_height, frame_width)
-    if frame_height % block_size != 0 or frame_width % block_size != 0:
-        raise Exception("search_expand_length is not multiple of block size")
+    # if frame_height % block_size != 0 or frame_width % block_size != 0:
+    #     raise Exception("search_expand_length is not multiple of block size")
     level_num = 4
     n = int(block_size/(math.pow(2, level_num-1)))
     k = int(search_expand_length/(math.pow(2, level_num-1)))
@@ -219,6 +219,7 @@ def hierarchical_search(base_block, area_to_searched, block_size, search_expand_
     # # print(candidates, candidates_SADs)
 
     res = []
+    # return a list of coordinates who has the smallest SAD
     candidates_SAD_min[0] = min(candidates_SADs)
     for i in range(len(candidates)):
         if candidates_SADs[i] == candidates_SAD_min[0]:
@@ -241,7 +242,7 @@ def get_search_area(x, y, frame, block_size, search_expand_length):
     search_area = frame[sy:min(y+search_expand_length+block_size, h), sx:min(x+search_expand_length+block_size, w)]
     return search_area, [sy, min(y+search_expand_length+block_size, h), sx, min(x+search_expand_length+block_size, w)]
 
-def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, search_expand_length=32):
+def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, search_expand_length=16):
     #                            frame n             frame n+1                search_expand_length must be multiple of block_size
     # search  frame_base n+1       in     frame_being_searched n
     h, w = frame_being_searched.shape
@@ -249,6 +250,8 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, searc
     blockized_h, blockized_w = get_blockized_height_width(frame_being_searched, block_size)
     bcount = 0
     matrix = [[None for i in range(w//block_size)] for j in range(h//block_size)]
+
+    max_best_candidates_per_level = 10
 
     # for each block
     for y in range(0, blockized_h, block_size):
@@ -259,32 +262,56 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, searc
             # print(cur_block.shape, search_area.shape)
             # matchBlock, dx, dy = TSS(cur_block, search_area, block_size, search_expand_length)
             # print(dx, dy)
-            best_matches, SAD = hierarchical_search(base_block, search_area, block_size, search_expand_length, 5)
-            if len(best_matches) > 1:
-                print("multiple best candidates", SAD, best_matches)
-            match_relative_y, match_relative_x = best_matches[0]
-            match_y = match_relative_y + max(0, y-search_expand_length)
-            match_x = match_relative_x + max(0, x-search_expand_length)
-            dx = x - match_x
-            dy = y - match_y
-            # if dx != 0 or dy != 0:
-            #     print(y,x, match_y,match_x,dy,dx,SAD, indices, search_area.shape)
-            matrix[y//block_size][x//block_size] = [dy , dx]
-            # predicted[y:y+block_size, x:x+block_size] = frame_being_searched[match_y:match_y+block_size, match_x:match_x+block_size]
+            
+            # best_matches is not the motion vector, is based on clipped search area
+            best_matches, SAD = hierarchical_search(base_block, search_area, block_size, search_expand_length, max_best_candidates_per_level)
 
-    return matrix
+            # print(SAD//(block_size*block_size)) # this is MAD
+
+            # # multiple candidates usually adjacent, take average
+            # if len(best_matches) > 1:
+            #     # print("multiple best candidates", SAD, best_matches)
+            #     temp0 = 0
+            #     temp1 = 0
+            #     templ = len(best_matches)
+            #     for i in range(templ):
+            #         temp0 += best_matches[i][0]
+            #         temp1 += best_matches[i][1]
+            #     avg_coord1 = temp0//templ
+            #     avg_coord2 = temp1//templ
+            #     best_matches[0] = (avg_coord1, avg_coord2)
+    
+            motion_vectors = []
+            for best_match in best_matches:
+                match_relative_y, match_relative_x = best_match
+                match_y = match_relative_y + max(0, y-search_expand_length) # match position in n
+                match_x = match_relative_x + max(0, x-search_expand_length)
+                dx = x - match_x
+                dy = y - match_y
+                # if dx != 0 or dy != 0:
+                #     print(y,x, match_y,match_x,dy,dx,SAD, indices, search_area.shape)
+                motion_vectors.append([dy , dx])
+
+            # motion points from n to n+1
+            matrix[y//block_size][x//block_size] = motion_vectors
+            predicted[y:y+block_size, x:x+block_size] = frame_being_searched[match_y:match_y+block_size, match_x:match_x+block_size]
+
+    # assert bcount == int(blockized_h / block_size * blockized_w / block_size) #check all macroblocks are accounted for
+    return matrix, predicted
+
+def save_intermediate_images(frame_base, predicted, intermediate_output_dict="OUTPUT", idx = None):
     residualFrame = residual(frame_base, predicted)
 
-    outfile="OUTPUT"
-    isdir = os.path.isdir(outfile)
+    
+    isdir = os.path.isdir(intermediate_output_dict)
     if not isdir:
-        os.mkdir(outfile)
+        os.mkdir(intermediate_output_dict)
 
-    saveOutput = True
-    if saveOutput:
+
+    if idx:
         # cv2.imwrite(f"{outfile}/targetFrame.png", targetFrame)
-        cv2.imwrite(f"{outfile}/predictedFrame.png", predicted)
-        cv2.imwrite(f"{outfile}/residualFrame.png", residualFrame)
+        cv2.imwrite(f"{intermediate_output_dict}/predictedFrame"+"{:03d}".format(idx)+".png", predicted)
+        cv2.imwrite(f"{intermediate_output_dict}/residualFrame"+"{:03d}".format(idx)+".png", residualFrame)
         # cv2.imwrite(f"{outfile}/reconstructTargetFrame.png", reconstructTargetFrame)
         # cv2.imwrite(f"{outfile}/naiveResidualFrame.png", naiveResidualFrame)
         # resultsFile = open(f"{outfile}/results.txt", "w"); resultsFile.write(f"{rmText}\n{nrmText}\n"); resultsFile.close()
@@ -292,25 +319,45 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, searc
             #print("AnchorSearchArea: ", anchorSearchArea.shape)
 
             # anchorBlock, px, py = getBestMatch(cur_block, search_area, block_size) #get best anchor macroblock
-    # assert bcount == int(blockized_h / block_size * blockized_w / block_size) #check all macroblocks are accounted for
+    else:
+        
+        cv2.imwrite(f"{intermediate_output_dict}/predictedFrame.png", predicted)
+        cv2.imwrite(f"{intermediate_output_dict}/residualFrame.png", residualFrame)
 
-if __name__ == "__main__":
-    # test.py arg1 arg2
-    # if len(sys.argv) == 3:
-    #     sys.argv[1]
-    #     sys.argv[2]
-    # elif len(sys.argv) == 1:
-    #     pass
-    anchor_path = "C:/Users/14048/Desktop/20221130141838.png"
-    target_path = "C:/Users/14048/Desktop/20221130141838.png"
-    # main(anchorPath, targetPath, saveOutput=True)
-    anchor_path = "C:/Users/14048/Desktop/1.jpg"
-    target_path = "C:/Users/14048/Desktop/2.jpg"
-    frame_n0 = cv2.imread(anchor_path)
-    frame_n1 = cv2.imread(target_path)
-    block_size = 16
-    # blockized_h, blockized_w = get_blockized_height_width(frame_n0[:, :, 0], block_size)
-    # print(frame_n0[:, :, 0].shape, BGR2YCrCb(frame_n0)[:, :, 0].shape, cv2.resize(BGR2YCrCb(frame_n0)[:, :, 0], (blockized_w, blockized_h)).shape)
-    frame_n0_Y_blockized = preprocess_a_frame(frame_n0, block_size)
-    frame_n1_Y_blockized = preprocess_a_frame(frame_n1, block_size)
-    get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size)
+def draw_line_on_predicted(predicted, motion_vector_matrix, block_size):
+    # https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
+    h, w = predicted.shape
+    for vector_y in range(len(motion_vector_matrix)):
+        for vector_x in range(len(motion_vector_matrix[0])):
+            for motion_vector_matrix_pair in motion_vector_matrix[vector_y][vector_x]:
+                dy, dx = motion_vector_matrix_pair
+                # x01y01just for calculate (x0, y0) (x1, y1)
+                y0 = block_y = vector_y*block_size + block_size//2 # center
+                x0 = block_x = vector_x*block_size + block_size//2
+                y1 = last_block_y = block_y - dy
+                x1 = last_block_x = block_x - dx
+                steep = abs(dy) > abs(dx)
+                if steep:
+                    x0, y0 = y0, x0
+                    x1, y1 = y1, x1
+                if x0>x1:
+                    x0, x1 = x1, x0
+                    y0, y1 = y1, y0
+                deltax = x1-x0
+                deltay = abs(y1-y0)
+                error = deltax//2
+                y = y0
+                ystep = 1 if y0<y1 else -1
+                for x in range(x0, x1):
+                    if steep:
+                        #(y,x) is position following (x, y) format
+                        # predicted following (y, x) format
+                        if 0<=y<h and 0 <=x<w:
+                            predicted[x][y] = 255
+                    else:#(x,y)
+                        if 0<=y<h and 0 <=x<w:
+                            predicted[y][x] = 255
+                    error -= deltay
+                    if error < 0:
+                        y += ystep
+                        error += deltax
