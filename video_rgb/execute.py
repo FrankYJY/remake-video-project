@@ -32,6 +32,8 @@ if __name__ == "__main__":
 
     # runJavaRGB2PNG(parent_dict, main_folder)
 
+    if_calculate_prediction_and_output = True
+
     block_size = 16
     search_expand_length = 8
     frame_predict_step = 1
@@ -44,6 +46,7 @@ if __name__ == "__main__":
         frame_n1 = cv2.imread(frame_idx_1_path)
         frame_n0_Y_blockized = preprocess_a_frame(frame_n0, block_size)
         frame_n1_Y_blockized = preprocess_a_frame(frame_n1, block_size)
-        motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, search_expand_length, True)
-        draw_line_on_predicted(predicted, motion_vector_matrix, block_size)
-        save_intermediate_images(frame_n1_Y_blockized, predicted, idx = frame_idx_0)
+        motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, search_expand_length, if_calculate_prediction_and_output)
+        if if_calculate_prediction_and_output:
+            draw_line_on_predicted(predicted, motion_vector_matrix, block_size)
+            save_intermediate_images(frame_n1_Y_blockized, predicted, idx = frame_idx_0)

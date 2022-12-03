@@ -99,7 +99,7 @@ def TSS(block, search_area, block_size, search_expand_length): #3 Step Search
 def hierarchical_search(base_block, area_to_searched, block_size, search_expand_length, max_best_candidates_per_level = 1, best_candidates_SAD_no_bigger_than_minSAD_tolerate_range = 500):
     # modified
     #                                                      n must be 2^x            k                                              if set tolerate range, need to set for each level
-    # the return is based on frame_being_searched left_top_corner, matrix is [y, x, [[dy,dx],[dy,dx]...]   ]
+    # the return is based on frame_being_searched left_top_corner, matrix is [y][x][candidate idx][0:dy 1:x]
     def maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate):
         if candidates_SAD_max[0] == 0:
             # cache is filled with SAE=0 candidates, do not insert
