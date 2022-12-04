@@ -391,7 +391,7 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, metho
                 dy = y - match_y
                 # if dx != 0 or dy != 0:
                 #     print(y,x, match_y,match_x,dy,dx,SAD, indices, search_area.shape)
-                motion_vectors.append([dy , dx, MAD])
+                motion_vectors.append([dy , dx, SAD])
 
             # motion points from n to n+1
             # [y][x][candidate idx][0:dy 1:x]
@@ -437,10 +437,10 @@ def draw_line_on_predicted(predicted, motion_vector_matrix, block_size, draw_all
                     draw_a_line_on_predicted(h, w, d, vector_y, vector_x, motion_vector_matrix_pair, predicted)
             else:
                 # if only draw a line for a position, draw motion vector at position 0
-                draw_a_line_on_predicted(h, w, d, vector_y, vector_x, motion_vector_matrix[vector_y][vector_x][0], predicted)
+                draw_a_line_on_predicted(h, w, d, vector_y, vector_x, block_size, motion_vector_matrix[vector_y][vector_x][0], predicted)
 
 
-def draw_a_line_on_predicted(h, w, d, vector_y, vector_x, motion_vector_matrix_pair, predicted):
+def draw_a_line_on_predicted(h, w, d, vector_y, vector_x, block_size, motion_vector_matrix_pair, predicted):
     dy, dx = motion_vector_matrix_pair[0], motion_vector_matrix_pair[1]
     # x01y01just for calculate (x0, y0) (x1, y1)
     y0 = block_y = vector_y*block_size + block_size//2 # center
@@ -519,8 +519,8 @@ if __name__ == "__main__":
     # SAL_490_270_437
     # Stairs_490_270_346
     parent_dict = "C:\\Users\\14048\\Desktop\\multimedia\\project\\video_rgb\\Stairs_490_270_346/"
-    frame_idx_0_path = parent_dict + "Stairs_490_270_346.020.png"
-    frame_idx_1_path = parent_dict + "Stairs_490_270_346.030.png"
+    frame_idx_0_path = parent_dict + "Stairs_490_270_346.010.png"
+    frame_idx_1_path = parent_dict + "Stairs_490_270_346.015.png"
 
 
     # runJavaRGB2PNG('C:/Users/14048/Desktop/multimedia/project/video_rgb/', 'Stairs_490_270_346')
@@ -563,7 +563,7 @@ if __name__ == "__main__":
     frame_n1_w = len(frame_n1[0])
     frame_n1 = np.array([frame_n1[x][block_size:frame_n1_w-block_size] for x in range(block_size,frame_n1_h-block_size)])
     #frame_n1=frame_n1[block_size:frame_n1_h-block_size,block_size:frame_n1_w-block_size]
-    cluster_labels = cluster(cluster_data, 0.5)
+    cluster_labels = cluster(cluster_data)
 
     
 

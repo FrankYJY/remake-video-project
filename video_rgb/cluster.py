@@ -26,10 +26,10 @@ def cluster(points,eps=1,n_clusters=2):
             item[2]=0
     selectedPoints=[]
     '''
-    for item in selectPoints:
-        if(item[2]==1):
-            selectedPoints.append((item[0],item[1]))
-    features = selectedPoints
+    # for item in selectPoints:
+    #     if(item[2]==1):
+    #         selectedPoints.append((item[0],item[1]))
+    features = points
     scaler = StandardScaler()
     #scaled_features = scaler.fit_transform(features)
     
