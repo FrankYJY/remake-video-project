@@ -9,7 +9,7 @@ if __name__ == "__main__":
         # sys.argv[2]
     else:
         # directory = "C:/Users/14048/Desktop/multimedia/project/video_rgb/SAL_490_270_437"
-        directory = "C:\\Users\\14048\\Desktop\\multimedia\\project\\video_rgb\\SAL_490_270_437"
+        directory = "C:\\Users\\14048\\Desktop\\multimedia\\project\\video_rgb\\Stairs_490_270_346"
         splitted1 = directory.split("/")
         splitted2 = []
         for splitted1_seg in splitted1:
@@ -30,14 +30,15 @@ if __name__ == "__main__":
     height = int(dict_info[2])
     frame_num = int(dict_info[3])
 
-
-    # runJavaRGB2PNG(parent_dict, main_folder)
+    if not os.path.exists(parent_dict+"/"+main_folder+"/"+main_folder+".001.png"):
+        runJavaRGB2PNG(parent_dict+"/", main_folder)
 
     if_calculate_prediction_and_output = True
 
     block_size = 16
-    search_expand_length = 8
-    frame_predict_step = 4
+    search_expand_length = 16
+    frame_predict_step = 10
+    search_method = "h"  # h for hierarchical b for brute force
     for frame_idx_0 in range(frame_num-frame_predict_step):
         print("calculating motion vector" + str(frame_idx_0))
         frame_idx_1 = frame_idx_0 + frame_predict_step
@@ -49,10 +50,14 @@ if __name__ == "__main__":
         frame_n0 = cv2.resize(frame_n0, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
         frame_n1 = cv2.resize(frame_n1, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
         # preprocess_a_frame_size_inplace(frame_n0, block_size)
-        frame_n1 = preprocess_a_frame_size(frame_n1, block_size)
-        frame_n0_Y_blockized = preprocess_a_frame_to_Y(frame_n0, block_size)
-        frame_n1_Y_blockized = preprocess_a_frame_to_Y(frame_n1, block_size)
-        motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, search_expand_length, if_calculate_prediction_and_output)
+
+        frame_n0 = preprocess_a_frame_size(frame_n0, block_size, resizeT_cutoutF=True) # here is blockized
+        frame_n1 = preprocess_a_frame_size(frame_n1, block_size, resizeT_cutoutF=True) # here is blockized
+        frame_n0_Y_blockized = frame_n0
+        frame_n1_Y_blockized = frame_n1
+        # frame_n0_Y_blockized = preprocess_a_frame_to_Y(frame_n0, block_size)
+        # frame_n1_Y_blockized = preprocess_a_frame_to_Y(frame_n1, block_size)
+        motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, search_method, search_expand_length, if_calculate_prediction_and_output)
         if if_calculate_prediction_and_output:
             draw_line_on_predicted(predicted, motion_vector_matrix, block_size)
             save_intermediate_images(frame_n1_Y_blockized, predicted, idx = frame_idx_0)
@@ -77,12 +82,12 @@ if __name__ == "__main__":
         frame_n1_w = len(frame_n1[0])
         frame_n1 = np.array([frame_n1[x][block_size:frame_n1_w-block_size] for x in range(block_size,frame_n1_h-block_size)])
         #frame_n1=frame_n1[block_size:frame_n1_h-block_size,block_size:frame_n1_w-block_size]
-        cluster_labels = cluster(cluster_data, 0.5)
+        cluster_labels = cluster(cluster_data)
 
         
 
         labels_descending = get_cluster_labels_descending(cluster_labels)
-
+        print(len(labels_descending), "clusters")
         frame_n1_RGBA_base = cv2.cvtColor(frame_n1, cv2.COLOR_RGB2RGBA)
         extracted_frame_n1_RGBA_s = []
         for label, label_count in labels_descending:
@@ -99,4 +104,3 @@ if __name__ == "__main__":
             extracted_frame_n1_RGBA_s.append(frame_n1_RGBA)
             cv2.imshow("frame_n1_RGBA" + str(label), frame_n1_RGBA)
             cv2.waitKey(0)
-            print("")

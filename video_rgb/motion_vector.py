@@ -25,26 +25,31 @@ def get_blockized_height_width(frame, block_size):
     return h_block_num * block_size, w_block_num * block_size
 
 
-def preprocess_a_frame_to_Y(frame_path_or_ndarray, block_size):
+def preprocess_a_frame_to_Y(frame_path_or_ndarray, block_size, resizeT_cutoutF = False):
     # get luminosity and blockize
 
     if isinstance(frame_path_or_ndarray, str):
         # should be rgb to yuv, but y is same
-        frame_Y = BGR2YCrCb(cv2.imread(frame_path_or_ndarray))[:, :, 0] # get luminosity
+        # frame_Y = BGR2YCrCb(cv2.imread(frame_path_or_ndarray))[:, :, np.newaxis] # get luminosity
+        pass
 
     elif isinstance(frame_path_or_ndarray, np.ndarray):
-        frame_Y = BGR2YCrCb(frame_path_or_ndarray)[:, :, 0] # get luminosity
+        frame_Y = BGR2YCrCb(frame_path_or_ndarray)[:, :, 1] # get luminosity
 
     else:
         raise ValueError
 
     #resize frame to fit segmentation
     blockized_h, blockized_w = get_blockized_height_width(frame_Y, block_size)
-    frame_Y_blockized = cv2.resize(frame_Y, (blockized_w, blockized_h))
-
+    if resizeT_cutoutF:
+        frame_Y_blockized = cv2.resize(frame_Y, (blockized_w, blockized_h))
+    else:
+        frame_Y_blockized = np.array([[frame_Y[h][w] for w in range(blockized_w)]for h in range(blockized_h)])
+    
+    frame_Y_blockized = frame_Y_blockized[:,:,np.newaxis]# [h, w, 1]
     return frame_Y_blockized
 
-def preprocess_a_frame_size(frame_path_or_ndarray, block_size):
+def preprocess_a_frame_size(frame_path_or_ndarray, block_size, resizeT_cutoutF = False):
     # get luminosity and blockize
 
     if isinstance(frame_path_or_ndarray, str):
@@ -57,7 +62,11 @@ def preprocess_a_frame_size(frame_path_or_ndarray, block_size):
 
     #resize frame to fit segmentation
     blockized_h, blockized_w = get_blockized_height_width(frame_path_or_ndarray, block_size)
-    return cv2.resize(frame_path_or_ndarray, (blockized_w, blockized_h))
+    if resizeT_cutoutF:
+        frame_blockized = cv2.resize(frame_path_or_ndarray, (blockized_w, blockized_h))
+    else:
+        frame_blockized = np.array([[frame_path_or_ndarray[h][w] for w in range(blockized_w)]for h in range(blockized_h)])
+    return frame_blockized
 
 def getBlockZone(coord, search_area, block, block_size):
     px, py = coord # coordinates of macroblock center
@@ -119,40 +128,7 @@ def hierarchical_search(base_block, area_to_searched, block_size, search_expand_
     # modified
     #                                                      n must be 2^x            k                                              if set tolerate range, need to set for each level
     # the return is based on frame_being_searched left_top_corner, matrix is [[dx0,dy0][dx1,dy1]...] [candidate idx][0:dy 1:x]
-    def maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate):
-        if candidates_SAD_max[0] == 0:
-            # cache is filled with SAE=0 candidates, do not insert
-            return
-        if max_best_candidates_per_level > 1:
-            if SAD < candidates_SAD_min[0] + best_candidates_SAD_no_bigger_than_minSAD_tolerate_range:
-                if len(candidates) == max_best_candidates_per_level:
-                    index_to_pop = candidates_SADs.index(candidates_SAD_max[0])
-                    candidates.pop(index_to_pop)
-                    candidates_SADs.pop(index_to_pop)
-                candidates.append((y_of_candidate, x_of_candidate))
-                candidates_SADs.append(SAD)
-                if candidates_SAD_max[0] == math.inf:
-                    candidates_SAD_max[0] = 0
-                candidates_SAD_max[0] = max(candidates_SADs)
-                if SAD < candidates_SAD_min[0]:
-                    candidates_SAD_min[0] = SAD
-                    # wipe out too big candidates if new one is so much better
-                    # for i in range(len(candidates)-1, -1, -1):
-                    #     if candidates_SADs[i] > candidates_SAD_min[0] + best_candidates_SAD_no_bigger_than_minSAD_tolerate_range:
-                    #         # print("pop", candidates_SADs[i], "because of out of range", candidates_SAD_min[0] + best_candidates_SAD_no_bigger_than_minSAD_tolerate_range)
-                    #         candidates.pop(i)
-                    #         candidates_SADs.pop(i)
-        elif max_best_candidates_per_level == 1:
-            if len(candidates_SADs) == 0:
-                candidates_SADs.append(SAD)
-                candidates.append((y_of_candidate, x_of_candidate))
-            if SAD < candidates_SADs[0]:
-                candidates_SADs[0] = SAD
-                candidates[0] = (y_of_candidate, x_of_candidate)
-            # print(SAD, candidates_SADs, candidates_SAD_min, candidates_SAD_max)
-
-
-    frame_height, frame_width = area_to_searched.shape
+    frame_height, frame_width, color_depth = area_to_searched.shape
     # print(frame_height, frame_width)
     # if frame_height % block_size != 0 or frame_width % block_size != 0:
     #     raise Exception("search_expand_length is not multiple of block size")
@@ -179,8 +155,9 @@ def hierarchical_search(base_block, area_to_searched, block_size, search_expand_
                     # count1 += 1
                     y_in_frame = y_of_candidate + relative_y
                     x_in_frame = x_of_candidate + relative_x
-                    SAD += abs(int(base_block[relative_y][relative_x]) - int(area_to_searched[y_in_frame][x_in_frame]))
-            maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate)
+                    for color_depth_idx in range(color_depth):
+                        SAD += abs(int(base_block[relative_y][relative_x][color_depth_idx]) - int(area_to_searched[y_in_frame][x_in_frame][color_depth_idx]))
+            maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate, max_best_candidates_per_level, best_candidates_SAD_no_bigger_than_minSAD_tolerate_range)
     # print(candidates, candidates_SADs)
     
     for level in range(level_num-1, 0, -1):
@@ -216,9 +193,10 @@ def hierarchical_search(base_block, area_to_searched, block_size, search_expand_
                             # count1 += 1
                             y_in_frame = y_of_candidate + relative_y
                             x_in_frame = x_of_candidate + relative_x
-                            SAD += abs(int(base_block[relative_y][relative_x]) - int(area_to_searched[y_in_frame][x_in_frame]))
+                            for color_depth_idx in range(color_depth):
+                                SAD += abs(int(base_block[relative_y][relative_x][color_depth_idx]) - int(area_to_searched[y_in_frame][x_in_frame][color_depth_idx]))
                     # print(candidate, SAD)
-                    maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate)
+                    maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate, max_best_candidates_per_level, best_candidates_SAD_no_bigger_than_minSAD_tolerate_range)
         # print(candidates, candidates_SADs)
 
     # # at last, check itself
@@ -233,7 +211,7 @@ def hierarchical_search(base_block, area_to_searched, block_size, search_expand_
     #             y_in_frame = y_of_candidate + relative_y
     #             x_in_frame = x_of_candidate + relative_x
     #             SAD += abs(int(base_block[relative_y][relative_x]) - int(area_to_searched[y_in_frame][x_in_frame]))
-    #     maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate)
+    #     maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate, max_best_candidates_per_level, best_candidates_SAD_no_bigger_than_minSAD_tolerate_range)
     # # print(candidates, candidates_SADs)
 
     res = []
@@ -245,40 +223,42 @@ def hierarchical_search(base_block, area_to_searched, block_size, search_expand_
     # print(res, candidates_SAD_min[0])
     return res, candidates_SAD_min[0]
 
-def optimized_brute_force_search(base_block, area_to_searched, block_size, search_expand_length, max_best_candidates_per_level = 1, best_candidates_SAD_no_bigger_than_minSAD_tolerate_range = 500):
-    def maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate):
-        if candidates_SAD_max[0] == 0:
-            # cache is filled with SAE=0 candidates, do not insert
-            return
-        if max_best_candidates_per_level > 1:
-            if SAD < candidates_SAD_min[0] + best_candidates_SAD_no_bigger_than_minSAD_tolerate_range:
-                if len(candidates) == max_best_candidates_per_level:
-                    index_to_pop = candidates_SADs.index(candidates_SAD_max[0])
-                    candidates.pop(index_to_pop)
-                    candidates_SADs.pop(index_to_pop)
-                candidates.append((y_of_candidate, x_of_candidate))
-                candidates_SADs.append(SAD)
-                if candidates_SAD_max[0] == math.inf:
-                    candidates_SAD_max[0] = 0
-                candidates_SAD_max[0] = max(candidates_SADs)
-                if SAD < candidates_SAD_min[0]:
-                    candidates_SAD_min[0] = SAD
-                    # wipe out too big candidates if new one is so much better
-                    # for i in range(len(candidates)-1, -1, -1):
-                    #     if candidates_SADs[i] > candidates_SAD_min[0] + best_candidates_SAD_no_bigger_than_minSAD_tolerate_range:
-                    #         # print("pop", candidates_SADs[i], "because of out of range", candidates_SAD_min[0] + best_candidates_SAD_no_bigger_than_minSAD_tolerate_range)
-                    #         candidates.pop(i)
-                    #         candidates_SADs.pop(i)
-        elif max_best_candidates_per_level == 1:
-            if len(candidates_SADs) == 0:
-                candidates_SADs.append(SAD)
-                candidates.append((y_of_candidate, x_of_candidate))
-            if SAD < candidates_SADs[0]:
-                candidates_SADs[0] = SAD
-                candidates[0] = (y_of_candidate, x_of_candidate)
-            # print(SAD, candidates_SADs, candidates_SAD_min, candidates_SAD_max)
+def maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate, max_best_candidates_per_level, best_candidates_SAD_no_bigger_than_minSAD_tolerate_range):
+    if candidates_SAD_max[0] == 0:
+        # cache is filled with SAE=0 candidates, do not insert
+        return
+    if max_best_candidates_per_level > 1:
+        if SAD < candidates_SAD_min[0] + best_candidates_SAD_no_bigger_than_minSAD_tolerate_range:
+            if len(candidates) == max_best_candidates_per_level:
+                index_to_pop = candidates_SADs.index(candidates_SAD_max[0])
+                candidates.pop(index_to_pop)
+                candidates_SADs.pop(index_to_pop)
+            candidates.append((y_of_candidate, x_of_candidate))
+            candidates_SADs.append(SAD)
+            if candidates_SAD_max[0] == math.inf:
+                candidates_SAD_max[0] = 0
+            candidates_SAD_max[0] = max(candidates_SADs)
+            if SAD < candidates_SAD_min[0]:
+                candidates_SAD_min[0] = SAD
+                # wipe out too big candidates if new one is so much better
+                # for i in range(len(candidates)-1, -1, -1):
+                #     if candidates_SADs[i] > candidates_SAD_min[0] + best_candidates_SAD_no_bigger_than_minSAD_tolerate_range:
+                #         # print("pop", candidates_SADs[i], "because of out of range", candidates_SAD_min[0] + best_candidates_SAD_no_bigger_than_minSAD_tolerate_range)
+                #         candidates.pop(i)
+                #         candidates_SADs.pop(i)
+    elif max_best_candidates_per_level == 1:
+        if len(candidates_SADs) == 0:
+            candidates_SADs.append(SAD)
+            candidates.append((y_of_candidate, x_of_candidate))
+        if SAD < candidates_SADs[0]:
+            candidates_SADs[0] = SAD
+            candidates[0] = (y_of_candidate, x_of_candidate)
+        # print(SAD, candidates_SADs, candidates_SAD_min, candidates_SAD_max)
 
-    frame_height, frame_width = area_to_searched.shape
+def optimized_brute_force_search(base_block, area_to_searched, block_size, search_expand_length, max_best_candidates_per_level = 1, best_candidates_SAD_no_bigger_than_minSAD_tolerate_range = 500):
+
+
+    frame_height, frame_width, color_depth = area_to_searched.shape
     candidates = [] # to be faster could use heapq, maxpq, pop max when too much
     candidates_SADs = []
     candidates_SAD_max = [math.inf]
@@ -291,8 +271,10 @@ def optimized_brute_force_search(base_block, area_to_searched, block_size, searc
                 for relative_x in range(block_size):
                     y_in_frame = y_of_candidate + relative_y
                     x_in_frame = x_of_candidate + relative_x
-                    SAD += abs(int(base_block[relative_y][relative_x]) - int(area_to_searched[y_in_frame][x_in_frame]))
-            maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate)
+                    # SAD += abs(int(base_block[relative_y][relative_x]) - int(area_to_searched[y_in_frame][x_in_frame]))
+                    for color_depth_idx in range(color_depth):
+                        SAD += abs(int(base_block[relative_y][relative_x][color_depth_idx]) - int(area_to_searched[y_in_frame][x_in_frame][color_depth_idx]))
+            maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate, max_best_candidates_per_level, best_candidates_SAD_no_bigger_than_minSAD_tolerate_range)
 
     # # not work!!!
     # AD_frame = [[abs(int(area_to_searched[y][x]) - int(area_to_searched[y][x])) for x in range(frame_width)] for y in range(frame_height)]
@@ -334,7 +316,7 @@ def residual(target, predicted):
     return np.subtract(target, predicted)
 
 def get_search_area(x, y, frame, block_size, search_expand_length):
-    h, w = frame.shape
+    h, w = frame.shape[0], frame.shape[1]
     # cx, cy = getCenter(x, y, block_size)
     # sx = max(0, cx-int(block_size/2)-searchArea) # ensure search area is in bounds
     # sy = max(0, cy-int(block_size/2)-searchArea) # and get top left corner of search area
@@ -344,13 +326,21 @@ def get_search_area(x, y, frame, block_size, search_expand_length):
     search_area = frame[sy:min(y+search_expand_length+block_size, h), sx:min(x+search_expand_length+block_size, w)]
     return search_area, [sy, min(y+search_expand_length+block_size, h), sx, min(x+search_expand_length+block_size, w)]
 
-def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, search_expand_length=16, if_generate_predict_frames = False):
+def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, method = "h", search_expand_length=16, if_generate_predict_frames = False):
     #                            frame n             frame n+1                search_expand_length must be multiple of block_size
+    #                                                                      h: hierarchical  b: brute force
     # search  frame_base n+1       in     frame_being_searched n
-    h, w = frame_being_searched.shape
+    dimensions = 0
+    if len(frame_being_searched.shape) == 2:
+        h, w = frame_being_searched.shape
+        color_depth = 1
+        dimensions = 2
+    elif len(frame_being_searched.shape) == 3:
+        h, w, color_depth = frame_being_searched.shape
+        dimensions = 3
     predicted = None
     if if_generate_predict_frames:
-        predicted = np.ones((h, w))*255
+        predicted = np.ones((h, w, color_depth))*255
     blockized_h, blockized_w = get_blockized_height_width(frame_being_searched, block_size)
     bcount = 0
     matrix = [[None for i in range(w//block_size)] for j in range(h//block_size)]
@@ -368,14 +358,19 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, searc
             # print(dx, dy)
             
             # best_matches is not the motion vector, is based on clipped search area
-            # best_matches, SAD = hierarchical_search(base_block, search_area, block_size, search_expand_length, max_best_candidates_per_level)
-            best_matches, SAD = optimized_brute_force_search(base_block, search_area, block_size, search_expand_length, max_best_candidates_per_level)
+            if method == "h":
+                best_matches, SAD = hierarchical_search(base_block, search_area, block_size, search_expand_length, max_best_candidates_per_level)
+            elif method == "b":
+                best_matches, SAD = optimized_brute_force_search(base_block, search_area, block_size, search_expand_length, max_best_candidates_per_level)
+            else:
+                raise Exception("do not input correct method code")
 
             MAD = SAD//(block_size*block_size) # this is MAD
 
             # multiple candidates usually adjacent, take average
             if len(best_matches) > 1:
-                print("multiple best candidates", SAD, best_matches)
+                # print before set avg to position 0
+                print("multiple best candidates SAD", SAD, best_matches)
                 temp0 = 0
                 temp1 = 0
                 templ = len(best_matches)
@@ -396,7 +391,7 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, searc
                 dy = y - match_y
                 # if dx != 0 or dy != 0:
                 #     print(y,x, match_y,match_x,dy,dx,SAD, indices, search_area.shape)
-                motion_vectors.append([dy , dx, MAD])
+                motion_vectors.append([dy , dx, SAD])
 
             # motion points from n to n+1
             # [y][x][candidate idx][0:dy 1:x]
@@ -432,43 +427,52 @@ def save_intermediate_images(frame_base, predicted, intermediate_output_dict="OU
         cv2.imwrite(f"{intermediate_output_dict}/predictedFrame.png", predicted)
         cv2.imwrite(f"{intermediate_output_dict}/residualFrame.png", residualFrame)
 
-def draw_line_on_predicted(predicted, motion_vector_matrix, block_size):
+def draw_line_on_predicted(predicted, motion_vector_matrix, block_size, draw_all = False):
     # https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
-    h, w = predicted.shape
+    h, w, d = predicted.shape
     for vector_y in range(len(motion_vector_matrix)):
         for vector_x in range(len(motion_vector_matrix[0])):
-            for motion_vector_matrix_pair in motion_vector_matrix[vector_y][vector_x]:
-                dy, dx = motion_vector_matrix_pair[0], motion_vector_matrix_pair[1]
-                # x01y01just for calculate (x0, y0) (x1, y1)
-                y0 = block_y = vector_y*block_size + block_size//2 # center
-                x0 = block_x = vector_x*block_size + block_size//2
-                y1 = last_block_y = block_y - dy
-                x1 = last_block_x = block_x - dx
-                steep = abs(dy) > abs(dx)
-                if steep:
-                    x0, y0 = y0, x0
-                    x1, y1 = y1, x1
-                if x0>x1:
-                    x0, x1 = x1, x0
-                    y0, y1 = y1, y0
-                deltax = x1-x0
-                deltay = abs(y1-y0)
-                error = deltax//2
-                y = y0
-                ystep = 1 if y0<y1 else -1
-                for x in range(x0, x1):
-                    if steep:
-                        #(y,x) is position following (x, y) format
-                        # predicted following (y, x) format
-                        if 0<=y<h and 0 <=x<w:
-                            predicted[x][y] = 255
-                    else:#(x,y)
-                        if 0<=y<h and 0 <=x<w:
-                            predicted[y][x] = 255
-                    error -= deltay
-                    if error < 0:
-                        y += ystep
-                        error += deltax
+            if draw_all:
+                for motion_vector_matrix_pair in motion_vector_matrix[vector_y][vector_x]:
+                    draw_a_line_on_predicted(h, w, d, vector_y, vector_x, motion_vector_matrix_pair, predicted)
+            else:
+                # if only draw a line for a position, draw motion vector at position 0
+                draw_a_line_on_predicted(h, w, d, vector_y, vector_x, block_size, motion_vector_matrix[vector_y][vector_x][0], predicted)
+
+
+def draw_a_line_on_predicted(h, w, d, vector_y, vector_x, block_size, motion_vector_matrix_pair, predicted):
+    dy, dx = motion_vector_matrix_pair[0], motion_vector_matrix_pair[1]
+    # x01y01just for calculate (x0, y0) (x1, y1)
+    y0 = block_y = vector_y*block_size + block_size//2 # center
+    x0 = block_x = vector_x*block_size + block_size//2
+    y1 = last_block_y = block_y - dy
+    x1 = last_block_x = block_x - dx
+    steep = abs(dy) > abs(dx)
+    if steep:
+        x0, y0 = y0, x0
+        x1, y1 = y1, x1
+    if x0>x1:
+        x0, x1 = x1, x0
+        y0, y1 = y1, y0
+    deltax = x1-x0
+    deltay = abs(y1-y0)
+    error = deltax//2
+    y = y0
+    ystep = 1 if y0<y1 else -1
+    color = [0,255,0]
+    for x in range(x0, x1):
+        if steep:
+            #(y,x) is position following (x, y) format
+            # predicted following (y, x) format
+            if 0<=y<h and 0 <=x<w:
+                predicted[x][y] = color
+        else:#(x,y)
+            if 0<=y<h and 0 <=x<w:
+                predicted[y][x] = color
+        error -= deltay
+        if error < 0:
+            y += ystep
+            error += deltax
 
 # data refine
 def motion_vector_candidates_set_min_length_to_candidate_idx_0_inplace(motion_vector_matrix):
@@ -493,8 +497,8 @@ def make_cluster_dataset_of_motion_vectors(motion_vector_matrix):
     for vector_y in range(len(motion_vector_matrix)):
         for vector_x in range(len(motion_vector_matrix[0])):
             motion_vector_matrix_candidate = motion_vector_matrix[vector_y][vector_x][0] # first candidate
-            cluster_data.append([motion_vector_matrix_candidate[0], motion_vector_matrix_candidate[1]])
-            # cluster_data.append(motion_vector_matrix_candidate)
+            # cluster_data.append([motion_vector_matrix_candidate[0], motion_vector_matrix_candidate[1]])
+            cluster_data.append(motion_vector_matrix_candidate)
             motion_vector_xy_to_idx[(vector_y, vector_x)] = i
             i += 1
     
@@ -512,21 +516,32 @@ if __name__ == "__main__":
     # frame_idx_1_path = parent_dict + "reference_11dx_15dy.jpg"
     frame_idx_1_path = parent_dict + "reference_minus4dx_minus6dy.jpg"
 
-    # runJavaRGB2PNG(parent_dict, main_folder)
+    # SAL_490_270_437
+    # Stairs_490_270_346
+    parent_dict = "C:\\Users\\14048\\Desktop\\multimedia\\project\\video_rgb\\Stairs_490_270_346/"
+    frame_idx_0_path = parent_dict + "Stairs_490_270_346.010.png"
+    frame_idx_1_path = parent_dict + "Stairs_490_270_346.015.png"
+
+
+    # runJavaRGB2PNG('C:/Users/14048/Desktop/multimedia/project/video_rgb/', 'Stairs_490_270_346')
 
     frame_n0 = cv2.imread(frame_idx_0_path)
     frame_n1 = cv2.imread(frame_idx_1_path)
+    temp_store_predicted_in_index = 4
 
-    frame_n0 = cv2.resize(frame_n0, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
-    frame_n1 = cv2.resize(frame_n1, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
+    # frame_n0 = cv2.resize(frame_n0, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
+    # frame_n1 = cv2.resize(frame_n1, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
     # preprocess_a_frame_size_inplace(frame_n0, block_size)
-    frame_n1 = preprocess_a_frame_size(frame_n1, block_size)
-    frame_n0_Y_blockized = preprocess_a_frame_to_Y(frame_n0, block_size)
-    frame_n1_Y_blockized = preprocess_a_frame_to_Y(frame_n1, block_size)
-    motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, search_expand_length, if_calculate_prediction_and_output)
+    frame_n0 = preprocess_a_frame_size(frame_n0, block_size, resizeT_cutoutF=False) # here is blockized
+    frame_n1 = preprocess_a_frame_size(frame_n1, block_size, resizeT_cutoutF=False) # here is blockized
+    frame_n0_Y_blockized = frame_n0
+    frame_n1_Y_blockized = frame_n1
+    # frame_n0_Y_blockized = preprocess_a_frame_to_Y(frame_n0, block_size)
+    # frame_n1_Y_blockized = preprocess_a_frame_to_Y(frame_n1, block_size)
+    motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, "h", search_expand_length, if_calculate_prediction_and_output)
     if if_calculate_prediction_and_output:
         draw_line_on_predicted(predicted, motion_vector_matrix, block_size)
-        save_intermediate_images(frame_n1_Y_blockized, predicted, idx = 0)
+        save_intermediate_images(frame_n1_Y_blockized, predicted, idx = temp_store_predicted_in_index)
     motion_vector_candidates_set_min_length_to_candidate_idx_0_inplace(motion_vector_matrix)
 
     # cutting out edges
@@ -548,7 +563,7 @@ if __name__ == "__main__":
     frame_n1_w = len(frame_n1[0])
     frame_n1 = np.array([frame_n1[x][block_size:frame_n1_w-block_size] for x in range(block_size,frame_n1_h-block_size)])
     #frame_n1=frame_n1[block_size:frame_n1_h-block_size,block_size:frame_n1_w-block_size]
-    cluster_labels = cluster(cluster_data, 0.5)
+    cluster_labels = cluster(cluster_data)
 
     
 
