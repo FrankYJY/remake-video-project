@@ -6,6 +6,9 @@ import os
 import sys
 import math
 import collections
+from motion_vector import *
+from getPNGPath import *
+from cluster import *
 
 def YCrCb2BGR(image):
     return cv2.cvtColor(image, cv2.COLOR_YCrCb2BGR)
@@ -133,11 +136,12 @@ def hierarchical_search(base_block, area_to_searched, block_size, search_expand_
                 candidates_SAD_max[0] = max(candidates_SADs)
                 if SAD < candidates_SAD_min[0]:
                     candidates_SAD_min[0] = SAD
-                    for i in range(len(candidates)-1, -1, -1):
-                        if candidates_SADs[i] > candidates_SAD_min[0] + best_candidates_SAD_no_bigger_than_minSAD_tolerate_range:
-                            # print("pop", candidates_SADs[i], "because of out of range", candidates_SAD_min[0] + best_candidates_SAD_no_bigger_than_minSAD_tolerate_range)
-                            candidates.pop(i)
-                            candidates_SADs.pop(i)
+                    # wipe out too big candidates if new one is so much better
+                    # for i in range(len(candidates)-1, -1, -1):
+                    #     if candidates_SADs[i] > candidates_SAD_min[0] + best_candidates_SAD_no_bigger_than_minSAD_tolerate_range:
+                    #         # print("pop", candidates_SADs[i], "because of out of range", candidates_SAD_min[0] + best_candidates_SAD_no_bigger_than_minSAD_tolerate_range)
+                    #         candidates.pop(i)
+                    #         candidates_SADs.pop(i)
         elif max_best_candidates_per_level == 1:
             if len(candidates_SADs) == 0:
                 candidates_SADs.append(SAD)
@@ -156,7 +160,6 @@ def hierarchical_search(base_block, area_to_searched, block_size, search_expand_
     n = int(block_size/(math.pow(2, level_num-1)))
     k = int(search_expand_length/(math.pow(2, level_num-1)))
     # min sum absulute diff
-    min_SAD = math.inf
     candidates = [] # to be faster could use heapq, maxpq, pop max when too much
     candidates_SADs = []
     candidates_SAD_max = [math.inf]
@@ -187,7 +190,6 @@ def hierarchical_search(base_block, area_to_searched, block_size, search_expand_
         last_iteration_candidates = candidates
 
         step = int(math.pow(2, level-1))
-        min_SAD = math.inf
         candidates = [] # to be faster could use heapq, maxpq, pop max when too much
         candidates_SADs = []
         candidates_SAD_max = [math.inf]  # for referential change, access as arr[0]
@@ -243,6 +245,90 @@ def hierarchical_search(base_block, area_to_searched, block_size, search_expand_
     # print(res, candidates_SAD_min[0])
     return res, candidates_SAD_min[0]
 
+def optimized_brute_force_search(base_block, area_to_searched, block_size, search_expand_length, max_best_candidates_per_level = 1, best_candidates_SAD_no_bigger_than_minSAD_tolerate_range = 500):
+    def maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate):
+        if candidates_SAD_max[0] == 0:
+            # cache is filled with SAE=0 candidates, do not insert
+            return
+        if max_best_candidates_per_level > 1:
+            if SAD < candidates_SAD_min[0] + best_candidates_SAD_no_bigger_than_minSAD_tolerate_range:
+                if len(candidates) == max_best_candidates_per_level:
+                    index_to_pop = candidates_SADs.index(candidates_SAD_max[0])
+                    candidates.pop(index_to_pop)
+                    candidates_SADs.pop(index_to_pop)
+                candidates.append((y_of_candidate, x_of_candidate))
+                candidates_SADs.append(SAD)
+                if candidates_SAD_max[0] == math.inf:
+                    candidates_SAD_max[0] = 0
+                candidates_SAD_max[0] = max(candidates_SADs)
+                if SAD < candidates_SAD_min[0]:
+                    candidates_SAD_min[0] = SAD
+                    # wipe out too big candidates if new one is so much better
+                    # for i in range(len(candidates)-1, -1, -1):
+                    #     if candidates_SADs[i] > candidates_SAD_min[0] + best_candidates_SAD_no_bigger_than_minSAD_tolerate_range:
+                    #         # print("pop", candidates_SADs[i], "because of out of range", candidates_SAD_min[0] + best_candidates_SAD_no_bigger_than_minSAD_tolerate_range)
+                    #         candidates.pop(i)
+                    #         candidates_SADs.pop(i)
+        elif max_best_candidates_per_level == 1:
+            if len(candidates_SADs) == 0:
+                candidates_SADs.append(SAD)
+                candidates.append((y_of_candidate, x_of_candidate))
+            if SAD < candidates_SADs[0]:
+                candidates_SADs[0] = SAD
+                candidates[0] = (y_of_candidate, x_of_candidate)
+            # print(SAD, candidates_SADs, candidates_SAD_min, candidates_SAD_max)
+
+    frame_height, frame_width = area_to_searched.shape
+    candidates = [] # to be faster could use heapq, maxpq, pop max when too much
+    candidates_SADs = []
+    candidates_SAD_max = [math.inf]
+    candidates_SAD_min = [math.inf]
+
+    for y_of_candidate in range(frame_height-block_size+1):
+        for x_of_candidate in range(1, frame_width-block_size+1):
+            SAD = int(0)
+            for relative_y in range(block_size):
+                for relative_x in range(block_size):
+                    y_in_frame = y_of_candidate + relative_y
+                    x_in_frame = x_of_candidate + relative_x
+                    SAD += abs(int(base_block[relative_y][relative_x]) - int(area_to_searched[y_in_frame][x_in_frame]))
+            maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate)
+
+    # # not work!!!
+    # AD_frame = [[abs(int(area_to_searched[y][x]) - int(area_to_searched[y][x])) for x in range(frame_width)] for y in range(frame_height)]
+    # for y_of_candidate in range(frame_height-block_size+1):
+    #     SAD = int(0)
+    #     # first block
+    #     x_of_candidate = 0
+    #     for relative_y in range(block_size):
+    #         for relative_x in range(block_size):
+    #             y_in_frame = y_of_candidate + relative_y
+    #             x_in_frame = x_of_candidate + relative_x
+    #             SAD += AD_frame[y_in_frame][x_in_frame]
+    #     maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate)
+    #     # later
+    #     for x_of_candidate in range(1, frame_width-block_size+1):
+    #         relative_x = -1
+    #         x_in_frame = x_of_candidate + relative_x
+    #         for relative_y in range(block_size):
+    #             y_in_frame = y_of_candidate + relative_y
+    #             SAD -= AD_frame[y_in_frame][x_in_frame]
+    #         relative_x = block_size-1
+    #         x_in_frame = x_of_candidate + relative_x
+    #         for relative_y in range(block_size):
+    #             y_in_frame = y_of_candidate + relative_y
+    #             SAD += AD_frame[y_in_frame][x_in_frame]
+    #         maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate)
+
+    res = []
+    # return a list of coordinates who has the smallest SAD
+    candidates_SAD_min[0] = min(candidates_SADs)
+    for i in range(len(candidates)):
+        if candidates_SADs[i] == candidates_SAD_min[0]:
+            res.append(candidates[i])
+    # print(res, candidates_SAD_min[0])
+    return res, candidates_SAD_min[0]
+
 
 def residual(target, predicted):
     return np.subtract(target, predicted)
@@ -282,22 +368,23 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, searc
             # print(dx, dy)
             
             # best_matches is not the motion vector, is based on clipped search area
-            best_matches, SAD = hierarchical_search(base_block, search_area, block_size, search_expand_length, max_best_candidates_per_level)
+            # best_matches, SAD = hierarchical_search(base_block, search_area, block_size, search_expand_length, max_best_candidates_per_level)
+            best_matches, SAD = optimized_brute_force_search(base_block, search_area, block_size, search_expand_length, max_best_candidates_per_level)
 
             MAD = SAD//(block_size*block_size) # this is MAD
 
             # multiple candidates usually adjacent, take average
             if len(best_matches) > 1:
                 print("multiple best candidates", SAD, best_matches)
-            #     temp0 = 0
-            #     temp1 = 0
-            #     templ = len(best_matches)
-            #     for i in range(templ):
-            #         temp0 += best_matches[i][0]
-            #         temp1 += best_matches[i][1]
-            #     avg_coord1 = temp0//templ
-            #     avg_coord2 = temp1//templ
-            #     best_matches[0] = (avg_coord1, avg_coord2)
+                temp0 = 0
+                temp1 = 0
+                templ = len(best_matches)
+                for i in range(templ):
+                    temp0 += best_matches[i][0]
+                    temp1 += best_matches[i][1]
+                avg_coord1 = temp0//templ
+                avg_coord2 = temp1//templ
+                best_matches[0] = (avg_coord1, avg_coord2)
     
 
             motion_vectors = []
@@ -412,3 +499,75 @@ def make_cluster_dataset_of_motion_vectors(motion_vector_matrix):
             i += 1
     
     return cluster_data, motion_vector_xy_to_idx
+
+if __name__ == "__main__":
+    if_calculate_prediction_and_output = True
+
+    block_size = 16
+    search_expand_length = 16
+    # frame_predict_step = 4
+
+    parent_dict = "C:/Users/14048/Desktop/multimedia/project/video_rgb/motion_test_img/"
+    frame_idx_0_path = parent_dict + "reference.jpg"
+    # frame_idx_1_path = parent_dict + "reference_11dx_15dy.jpg"
+    frame_idx_1_path = parent_dict + "reference_minus4dx_minus6dy.jpg"
+
+    # runJavaRGB2PNG(parent_dict, main_folder)
+
+    frame_n0 = cv2.imread(frame_idx_0_path)
+    frame_n1 = cv2.imread(frame_idx_1_path)
+
+    frame_n0 = cv2.resize(frame_n0, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
+    frame_n1 = cv2.resize(frame_n1, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
+    # preprocess_a_frame_size_inplace(frame_n0, block_size)
+    frame_n1 = preprocess_a_frame_size(frame_n1, block_size)
+    frame_n0_Y_blockized = preprocess_a_frame_to_Y(frame_n0, block_size)
+    frame_n1_Y_blockized = preprocess_a_frame_to_Y(frame_n1, block_size)
+    motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, search_expand_length, if_calculate_prediction_and_output)
+    if if_calculate_prediction_and_output:
+        draw_line_on_predicted(predicted, motion_vector_matrix, block_size)
+        save_intermediate_images(frame_n1_Y_blockized, predicted, idx = 0)
+    motion_vector_candidates_set_min_length_to_candidate_idx_0_inplace(motion_vector_matrix)
+
+    # cutting out edges
+    motion_vector_matrix_h = len(motion_vector_matrix)
+    motion_vector_matrix_w = len(motion_vector_matrix[0])
+    motion_vector_matrix = np.array([motion_vector_matrix[x][1:motion_vector_matrix_w-1] for x in range(1,motion_vector_matrix_h-1)])
+    cluster_data, motion_vector_xy_to_idx = make_cluster_dataset_of_motion_vectors(motion_vector_matrix)
+    # print(cluster_data)
+
+    dydx_tuples = []
+    for h in range(len(motion_vector_matrix)):
+        for w in range(len(motion_vector_matrix[0])):
+            dydx_tuples.append(tuple(motion_vector_matrix[h][w][0]))
+    print(Counter(dydx_tuples))
+
+
+    #motion_vector_matrix = motion_vector_matrix[1:motion_vector_matrix_h-1,1:motion_vector_matrix_w-1,:,:]
+    frame_n1_h = len(frame_n1)
+    frame_n1_w = len(frame_n1[0])
+    frame_n1 = np.array([frame_n1[x][block_size:frame_n1_w-block_size] for x in range(block_size,frame_n1_h-block_size)])
+    #frame_n1=frame_n1[block_size:frame_n1_h-block_size,block_size:frame_n1_w-block_size]
+    cluster_labels = cluster(cluster_data, 0.5)
+
+    
+
+    labels_descending = get_cluster_labels_descending(cluster_labels)
+
+    frame_n1_RGBA_base = cv2.cvtColor(frame_n1, cv2.COLOR_RGB2RGBA)
+    extracted_frame_n1_RGBA_s = []
+    for label, label_count in labels_descending:
+        frame_n1_RGBA = frame_n1_RGBA_base.copy()
+        for w in range(frame_n1_RGBA.shape[1]):
+            for h in range(frame_n1_RGBA.shape[0]):
+                h_idx = h // block_size
+                w_idx = w // block_size
+                cur_pixel_belongs_to_block_idx = motion_vector_xy_to_idx[(h_idx, w_idx)]
+                if cluster_labels[cur_pixel_belongs_to_block_idx] == label:
+                    frame_n1_RGBA[h][w][3] = 255
+                else:
+                    frame_n1_RGBA[h][w] = [0, 255, 0, 255]
+        extracted_frame_n1_RGBA_s.append(frame_n1_RGBA)
+        cv2.imshow("frame_n1_RGBA" + str(label), frame_n1_RGBA)
+        cv2.waitKey(0)
+        print("")

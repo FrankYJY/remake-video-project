@@ -118,7 +118,7 @@ def main():
     #     method = cv2.optflow.calcOpticalFlowDenseRLOF
     #     dense_optical_flow(method, video_path)
 
-    video_path = "C:/Users/14048/Desktop/multimedia/project/video_view/SAL_compacted.mp4"
+    video_path = "C:/Users/14048/Desktop/multimedia/project/video_view/Stairs.mp4"
     method = cv2.optflow.calcOpticalFlowSparseToDense
     dense_optical_flow(method, video_path, to_gray=True)
 

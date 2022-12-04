@@ -1,2 +1,0 @@
-Residual Metric: 0.00
-Naive Residual Metric: 0.00
