@@ -4,7 +4,9 @@ import numpy as np
 def drawCircle(image,p,color):
     cv2.circle(image,p,15,color=color,thickness=-1)
 
-def drawPanorama(image,imageNext,p1,p2,p3,p4,d1,d2,d3,d4):
+def drawPanorama(imageNext,p,image,d):
+    p1,p2,p3,p4 = p
+    d1,d2,d3,d4 = d
     height,width = image.shape[:2]
     #print(height,width)
     imageNext = cv2.copyMakeBorder(imageNext, 0 , height-imageNext.shape[0],0, width-imageNext.shape[1] , cv2.BORDER_CONSTANT, value=[0, 0, 0,0])
@@ -23,32 +25,20 @@ def drawPanorama(image,imageNext,p1,p2,p3,p4,d1,d2,d3,d4):
         #drawCircle(copied,point,color=(255,0,0))
         pass
     '''
-    p1=(1053,570)
-    p2=(463,570)
-    p3=(810,180)
-    p4=(30,180)
-    
     for p in [p1,p2,p3,p4]:
         drawCircle(imageNext,p,color=(0,0,255))
         pass
-    
-    d1=(1633,570)
-    d2=(1033,570)
-    d3=(1380,180)
-    d4=(620,180)
 
-
-    
     for p in [d1,d2,d3,d4]:
         drawCircle(copied,p,color=(0,255,0))
         pass
     
-    cv2.namedWindow("copied", cv2.WINDOW_NORMAL)    
-    cv2.imshow("copied",copied)
-    cv2.namedWindow("imageNext", cv2.WINDOW_NORMAL)    
-    cv2.imshow("imageNext", imageNext)
-    cv2.waitKey(0) # waits until a key is pressed
-    cv2.destroyAllWindows() # destroys the window showing image
+    #cv2.namedWindow("image", cv2.WINDOW_NORMAL)    
+    #cv2.imshow("image",copied)
+    #cv2.namedWindow("imageNext", cv2.WINDOW_NORMAL)    
+    #cv2.imshow("imageNext", imageNext)
+    #cv2.waitKey(0) # waits until a key is pressed
+    #cv2.destroyAllWindows() # destroys the window showing image
     #return 0
     src = np.float32([p1,p2,p3,p4])
     des = np.float32([d1,d2,d3,d4])
@@ -92,43 +82,67 @@ def drawPanorama(image,imageNext,p1,p2,p3,p4,d1,d2,d3,d4):
     transformMatrix= cv2.getPerspectiveTransform(src,des)
     height,width = imageNext.shape[:2]
     correctedImage = cv2.warpPerspective(imageNext,transformMatrix,(width,height),borderValue=(0,0,0,0))
-    print(1)
+    difference = 0 
+    countdiff=0
+    #print(1)
     for w in range(width):
         for h in range(height):
             if(correctedImage[h][w][3]!=0):
                 if(copied[h][w][3]!=0):
-                    copied[h][w]=copied[h][w]*[0.5,0.5,0.5,0.5]+correctedImage[h][w]*[0.5,0.5,0.5,0.5]
+                    copied[h][w]=copied[h][w]//[2,2,2,2]+correctedImage[h][w]//[2,2,2,2]
+                    countdiff+=1
+                    difference = sum([abs(int(copied[h][w][i])-int(correctedImage[h][w][i])) for i in range(3)])
                 else:
                     copied[h][w]=correctedImage[h][w]
                     
-                
-    print(2)
+    difference/=countdiff
+    #print(difference)            
+    #print(2)
     #copied.paste(correctedImage,(0,0))
-    cv2.namedWindow("copied", cv2.WINDOW_NORMAL)    
-    cv2.imshow("copied",copied)
-    cv2.namedWindow("imageNext", cv2.WINDOW_NORMAL)    
-    cv2.imshow("imageNext", imageNext)
-    cv2.waitKey(0) # waits until a key is pressed
-    cv2.destroyAllWindows() # destroys the window showing image
-    return copied
+    #cv2.namedWindow("copied", cv2.WINDOW_NORMAL)    
+    #cv2.imshow("copied",copied)
+    #cv2.namedWindow("imageNext", cv2.WINDOW_NORMAL)    
+    #cv2.imshow("imageNext", imageNext)
+    #cv2.waitKey(0) # waits until a key is pressed
+    #cv2.destroyAllWindows() # destroys the window showing image
+    return copied, difference
 
 
 def getTransformMatrix(p1,p2,p3,p4,d1,d2,d3,d4):
     src = np.float32([p1,p2,p3,p4])
     des = np.float32([d1,d2,d3,d4])
     return cv2.getPerspectiveTransform(src,des)
+def chooseCandidate(ps,ds):
+    panoramas=[]
+    diffs=[]
+    for i in range(len(ps)):
+        print("calculate panorama candidate "+str(i))
+        panorama, diff = drawPanorama(image,ps[i],prePanorama,ds[i])
+        panoramas.append(panorama)
+        diffs.append(diff)
+    print("differences of candidate panorama"+str(diffs))
+    finalpanorama = panoramas[diffs.index(min(diffs))]
+    cv2.namedWindow("finalpanorama", cv2.WINDOW_NORMAL)    
+    cv2.imshow("finalpanorama",finalpanorama)
+    cv2.waitKey(0) # waits until a key is pressed
+    cv2.destroyAllWindows() # destroys the window showing image
+    return finalpanorama
+        
+        
+p1=(1053,570)
+p2=(463,570)
+p3=(810,180)
+p4=(35,180)
+d1=(1628,570)
+d2=(1038,570)
+d3=(1385,180)
+d4=(610,180)  
 
-p1=(953,580)
-p2=(1660,580)
-p3=(953,1060)
-p4=(1860,1060)
-d1=(853,480)
-d2=(1760,480)
-d3=(853,960)
-d4=(1760,960)   
+ps=[[[1053,570],[463,570],[810,180],[35,180]],[[1055,570],[463,572],[810,181],[35,182]]]
+ds=[[[1628,570],[1038,570],[1385,180],[610,180]],[[1628,572],[1038,571],[1387,180],[615,180]]]
 path=""
 prePanorama = cv2.imread(path+"prePonorama.png")
 prePanorama = cv2.cvtColor(prePanorama, cv2.COLOR_RGB2RGBA)
 image = cv2.imread(path+"image.png")
 image = cv2.cvtColor(image, cv2.COLOR_RGB2RGBA)
-drawPanorama(prePanorama,image,p1,p2,p3,p4,d1,d2,d3,d4)
+chooseCandidate(ps,ds)
