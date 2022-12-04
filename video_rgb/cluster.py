@@ -8,22 +8,34 @@ from sklearn.datasets import make_blobs
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from collections import Counter
+import numpy as np
 
-
-def cluster(points,eps=0.3):
+def cluster(points,eps=1,n_clusters=2):
     '''
     features, true_labels = make_moons(
         n_samples=250, noise=0.05, random_state=42
     )
     '''
-    features = points
+    selectPoints=[[item[0],item[1],1] for item in points]
+    xmean=np.mean([item[0] for item in points])
+    ymean = np.mean([item[1] for item in points])
+    #print(xmean,ymean)
+    '''
+    for item in selectPoints:
+        if(((item[0]-xmean)*(item[0]-xmean)+(item[1]-ymean)*(item[1]-ymean))>1280):
+            item[2]=0
+    selectedPoints=[]
+    '''
+    for item in selectPoints:
+        if(item[2]==1):
+            selectedPoints.append((item[0],item[1]))
+    features = selectedPoints
     scaler = StandardScaler()
     #scaled_features = scaler.fit_transform(features)
-    # plt.scatter([item[0] for item in features],[item[1] for item in features],label="stars")
-    # plt.show()
+    
     scaled_features =features 
     # Instantiate k-means and dbscan algorithms
-    kmeans = KMeans(n_clusters=2, init = 'k-means++')
+    kmeans = KMeans(n_clusters=n_clusters, init = 'k-means++')
     dbscan = DBSCAN(eps=eps)
 
     # Fit the algorithms to the features
@@ -31,10 +43,12 @@ def cluster(points,eps=0.3):
     dbscan.fit(scaled_features)
 
     # Compute the silhouette scores for each algorithm
-    
+    '''
     kmeans_silhouette = silhouette_score(
         scaled_features, kmeans.labels_
     ).round(2)
+    '''
+    
     
     # dbscan_silhouette = silhouette_score(
     # scaled_features, dbscan.labels_
@@ -43,15 +57,34 @@ def cluster(points,eps=0.3):
     # print(features)
     # print(dbscan.labels_)
     
-    ''''
+    
+    #plt.scatter([item[0] for item in features],[item[1] for item in features],label="stars")
+    fte_colors = {
+        0: "#008fd5",
+        1: "#fc4f30",
+        2:"#00d724",
+        3:'#000000'
+    }
+    km_colors = [fte_colors[label] for label in range(n_clusters)]
+    plt.figure(figsize=(8,8))
+    #print(scaled_features[:][0])
+    #print(scaled_features[:][1])
+    plt.scatter([item[0] for item in features],[item[1] for item in features], c=dbscan.labels_,cmap="coolwarm")
+    
+    plt.scatter([xmean],[ymean], s=50,c='b')
+    plt.show()
+    '''
     # Plot the data and cluster silhouette comparison
     fig, (ax1, ax2) = plt.subplots(
-        1, 2, figsize=(8, 6), sharex=True, sharey=True
+        1, 2, figsize=(8, 8), sharex=True, sharey=True
     )
     fig.suptitle(f"Clustering Algorithm Comparison: Crescents", fontsize=16)
     fte_colors = {
         0: "#008fd5",
         1: "#fc4f30",
+        2:"#00d724",
+        3:'#000000'
+        
     }
     # The k-means plot
     km_colors = [fte_colors[label] for label in kmeans.labels_]
@@ -59,7 +92,8 @@ def cluster(points,eps=0.3):
     ax1.set_title(
         f"k-means\nSilhouette: {kmeans_silhouette}", fontdict={"fontsize": 12}
     )
-
+    plt.show()
+    
     # The dbscan plot
     
     db_colors = [fte_colors[label] for label in dbscan.labels_]
@@ -70,7 +104,16 @@ def cluster(points,eps=0.3):
     
     plt.show()
     '''
-    return kmeans.labels_
+    slabels=dbscan.labels_
+    res =[]
+    idx=0
+    for item in selectPoints:
+        if(item[2]==1):
+            res.append(slabels[idx])
+            idx+=1
+        else:
+            res.append(0)
+    return res
 
 def get_cluster_labels_descending(cluster_labels):
     cluster_labels_counts = Counter(cluster_labels)
