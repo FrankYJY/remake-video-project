@@ -31,6 +31,53 @@ def convert_bgra_2_video(arr, fps):
         out.write(cv2.cvtColor(arr[i], cv2.COLOR_BGRA2BGR))
     out.release()
 
+def app_one_display_trails(foreground_frame_arr, foreground_element_num, background_panorama):
+
+    display_trails_pic = background_panorama
+    display_trails_pic_height = len(display_trails_pic[0])
+    display_trails_pic_width = len(display_trails_pic[0][0])
+    interval_between_frames = (int)(len(foreground_frame_arr)/foreground_element_num)
+    for i in range(foreground_element_num):
+        for h_index in range(display_trails_pic_height):
+            for w_index in range(display_trails_pic_width):
+                #load alpha data of foreground_frame_arr. if it is 255 replace it with the display_trails_pic.
+                if foreground_frame_arr[i*interval_between_frames][3][h_index][w_index] == 255:
+                    display_trails_pic[0][h_index][w_index] = foreground_frame_arr[i*interval_between_frames][0][h_index][w_index]
+                    display_trails_pic[1][h_index][w_index] = foreground_frame_arr[i*interval_between_frames][1][h_index][w_index]
+                    display_trails_pic[2][h_index][w_index] = foreground_frame_arr[i*interval_between_frames][2][h_index][w_index]
+    save_pic_status = cv2.imwrite('app_one.png', display_trails_pic)
+    print("App one Image written save file: ", save_pic_status)
+#location_path is a n*3 array which [y, x, time] foreground_frame_arr have all foreground
+def app_two_create_video(foreground_frame_arr, background_panorama, fps, video_height, video_width, location_path):
+    frame_arr = []
+    start_frame_location = location_path[0]
+    for path_index in range(1:len(location_path)):
+        next_frame_location = location_path[path_index]
+        number_of_frame_between_interval = (next_frame_location[2] - start_frame_location[2]) * fps
+        height_change = (next_frame_location[0] - start_frame_location[0])/number_of_frame_between_interval
+        height_change = (int) height
+        width_change = (next_frame_location[1] - start_frame_location[1])/number_of_frame_between_interval
+        width_change = (int) width
+        for frame_index in range(number_of_frame_between_interval):
+            display_pic = [[[0]*width]*height]*4
+            for h_index in range(video_height):
+                for w_index in range(video_width):
+                    if foreground_frame_arr[start_frame_location[2]+frame_index][3][start_frame_location[0]+frame_index+h_index][start_frame_location[1]+frame_index+w_index] == 255:
+                        display_pic[0][h_index][w_index] = foreground_frame_arr[start_frame_location[2]+frame_index][0][start_frame_location[0]+frame_index+h_index][start_frame_location[1]+frame_index+w_index]
+                        display_pic[1][h_index][w_index] = foreground_frame_arr[start_frame_location[2]+frame_index][1][start_frame_location[0]+frame_index+h_index][start_frame_location[1]+frame_index+w_index]
+                        display_pic[2][h_index][w_index] = foreground_frame_arr[start_frame_location[2]+frame_index][2][start_frame_location[0]+frame_index+h_index][start_frame_location[1]+frame_index+w_index]
+                        display_pic[3][h_index][w_index] = 255
+                    else:
+                        display_pic[0][h_index][w_index] = background_panorama[0][start_frame_location[0]+frame_index+h_index][start_frame_location[1]+frame_index+w_index]
+                        display_pic[1][h_index][w_index] = background_panorama[1][start_frame_location[0]+frame_index+h_index][start_frame_location[1]+frame_index+w_index]
+                        display_pic[2][h_index][w_index] = background_panorama[2][start_frame_location[0]+frame_index+h_index][start_frame_location[1]+frame_index+w_index]
+                        display_pic[3][h_index][w_index] = 255
+            frame_arr.append(display_pic)
+        start_frame_location = next_frame_location
+    convert_bgra_2_video(frame_arr, fps)
+
+def app_three_remove_object()
+       print("...")
 
 if __name__ == "__main__":
     # video_path = "/Users/zihao/Documents/GitHub/remake-video-project/video_view/video2.mp4"
