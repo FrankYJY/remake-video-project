@@ -31,13 +31,13 @@ if __name__ == "__main__":
     frame_num = int(dict_info[3])
 
 
-    # runJavaRGB2PNG(parent_dict, main_folder)
+    runJavaRGB2PNG(parent_dict+"/", main_folder)
 
     if_calculate_prediction_and_output = True
 
     block_size = 16
     search_expand_length = 8
-    frame_predict_step = 4
+    frame_predict_step = 10
     for frame_idx_0 in range(frame_num-frame_predict_step):
         print("calculating motion vector" + str(frame_idx_0))
         frame_idx_1 = frame_idx_0 + frame_predict_step
@@ -46,13 +46,13 @@ if __name__ == "__main__":
         frame_n0 = cv2.imread(frame_idx_0_path)
         frame_n1 = cv2.imread(frame_idx_1_path)
 
-        frame_n0 = cv2.resize(frame_n0, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
-        frame_n1 = cv2.resize(frame_n1, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
+        # frame_n0 = cv2.resize(frame_n0, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
+        # frame_n1 = cv2.resize(frame_n1, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
         # preprocess_a_frame_size_inplace(frame_n0, block_size)
         frame_n1 = preprocess_a_frame_size(frame_n1, block_size)
         frame_n0_Y_blockized = preprocess_a_frame_to_Y(frame_n0, block_size)
         frame_n1_Y_blockized = preprocess_a_frame_to_Y(frame_n1, block_size)
-        motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, search_expand_length, if_calculate_prediction_and_output)
+        motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, "b", search_expand_length, if_calculate_prediction_and_output)
         if if_calculate_prediction_and_output:
             draw_line_on_predicted(predicted, motion_vector_matrix, block_size)
             save_intermediate_images(frame_n1_Y_blockized, predicted, idx = frame_idx_0)

@@ -11,6 +11,7 @@ import javax.swing.*;
 import javax.swing.text.StyledEditorKit.BoldAction;
 
 import java.lang.Math;
+
 // import java.lang.*;
 // import org.opencv.imgproc.Imgproc;
 public class RGB2PNG {
@@ -44,7 +45,7 @@ public class RGB2PNG {
 			height = Integer.parseInt(splitted2[2]);
 			frameNumber = Integer.parseInt(splitted2[3]);
 
-			//init outputPath
+			// init outputPath
 			pngOutputPath = new String[frameNumber];
 
 			layerLength = height * width;
@@ -232,7 +233,7 @@ public class RGB2PNG {
 
 	int fps = 30;
 
-	public synchronized void run(){
+	public synchronized void run() {
 		// // Read a parameter from command line
 		// String param1 = args[1];
 		// System.out.println("The second parameter was: " + param1);
@@ -250,7 +251,7 @@ public class RGB2PNG {
 				// [001, frameNumber]
 				actualFilePath = String.format("%s%03d.rgb", imgPathComponent1, i + 1);
 				outputFilePath = String.format("%s%03d.png", imgPathComponent1, i + 1);
-				//System.out.println(outputFilePath);
+				// System.out.println(outputFilePath);
 				// just initialize buffer
 				processedImgBuffer[i] = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
 				// all inplace
@@ -258,94 +259,97 @@ public class RGB2PNG {
 
 				loadByteArrToBuffer(currentFrame, processedImgBuffer[i]);
 
-				//save png file by pmz
+				// save png file by pmz
 				ImageIO.write(processedImgBuffer[i], "png", new File(outputFilePath));
-				pngOutputPath[i]=outputFilePath;
-				pngPathsFile.write(outputFilePath+'\n');
+				pngOutputPath[i] = outputFilePath;
+				pngPathsFile.write(outputFilePath + '\n');
 			}
 			pngPathsFile.close();
-	} catch (IOException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
-	}
-		//OUTPUT THE PATH OF PNG
-
-		/* 
-		lbIm1List = new JLabel[frameNumber];
-		for (int i = 0; i < frameNumber; i++) {
-			lbIm1List[i] = new JLabel(new ImageIcon(processedImgBuffer[i]));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
+		// OUTPUT THE PATH OF PNG
 
-		// Use label to display the image
-		// set once
-		frame = new JFrame();
-		GridBagLayout gLayout = new GridBagLayout();
-		frame.getContentPane().setLayout(gLayout);
-
-		GridBagConstraints c = new GridBagConstraints();
-		c.fill = GridBagConstraints.HORIZONTAL;
-		c.anchor = GridBagConstraints.CENTER;
-		c.weightx = 0.5;
-		c.gridx = 0;
-		c.gridy = 0;
-
-		c.fill = GridBagConstraints.HORIZONTAL;
-		c.gridx = 0;
-		c.gridy = 1;
-
-		JLabel curLabel = new JLabel();
-		curLabel.setIcon(new ImageIcon(processedImgBuffer[0]));
-		frame.getContentPane().add(curLabel, c);
-		frame.pack();
-		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		// frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-
-		frame.setVisible(true);
-
-		frame.setAlwaysOnTop(true);
-		frame.setAlwaysOnTop(false);
-
-		long startPlayTimestemp = System.currentTimeMillis();
-		double intervalMS = 1000 / fps;
-		// display
-		for (int i = 1; i < frameNumber; i++) {
-			try {
-				// next time - now
-				wait(startPlayTimestemp + (int) intervalMS * (i + 1) - System.currentTimeMillis());
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-			curLabel.setIcon(new ImageIcon(processedImgBuffer[i]));
-			frame.repaint();
-			// System.out.println("freshing " + i);
-		}
-
-		// System.out.println(String.format("use time %sms, %s intervals",
-		// String.valueOf(System.currentTimeMillis() - startPlayTimestemp),
-		// String.valueOf(frameNumber)));
-
-		frame.setVisible(false);
-		frame.dispose();*/
+		/*
+		 * lbIm1List = new JLabel[frameNumber];
+		 * for (int i = 0; i < frameNumber; i++) {
+		 * lbIm1List[i] = new JLabel(new ImageIcon(processedImgBuffer[i]));
+		 * }
+		 * 
+		 * // Use label to display the image
+		 * // set once
+		 * frame = new JFrame();
+		 * GridBagLayout gLayout = new GridBagLayout();
+		 * frame.getContentPane().setLayout(gLayout);
+		 * 
+		 * GridBagConstraints c = new GridBagConstraints();
+		 * c.fill = GridBagConstraints.HORIZONTAL;
+		 * c.anchor = GridBagConstraints.CENTER;
+		 * c.weightx = 0.5;
+		 * c.gridx = 0;
+		 * c.gridy = 0;
+		 * 
+		 * c.fill = GridBagConstraints.HORIZONTAL;
+		 * c.gridx = 0;
+		 * c.gridy = 1;
+		 * 
+		 * JLabel curLabel = new JLabel();
+		 * curLabel.setIcon(new ImageIcon(processedImgBuffer[0]));
+		 * frame.getContentPane().add(curLabel, c);
+		 * frame.pack();
+		 * frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		 * // frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+		 * 
+		 * frame.setVisible(true);
+		 * 
+		 * frame.setAlwaysOnTop(true);
+		 * frame.setAlwaysOnTop(false);
+		 * 
+		 * long startPlayTimestemp = System.currentTimeMillis();
+		 * double intervalMS = 1000 / fps;
+		 * // display
+		 * for (int i = 1; i < frameNumber; i++) {
+		 * try {
+		 * // next time - now
+		 * wait(startPlayTimestemp + (int) intervalMS * (i + 1) -
+		 * System.currentTimeMillis());
+		 * } catch (Exception e) {
+		 * e.printStackTrace();
+		 * }
+		 * curLabel.setIcon(new ImageIcon(processedImgBuffer[i]));
+		 * frame.repaint();
+		 * // System.out.println("freshing " + i);
+		 * }
+		 * 
+		 * // System.out.println(String.format("use time %sms, %s intervals",
+		 * // String.valueOf(System.currentTimeMillis() - startPlayTimestemp),
+		 * // String.valueOf(frameNumber)));
+		 * 
+		 * frame.setVisible(false);
+		 * frame.dispose();
+		 */
 	}
 
 	public static void main(String[] args) {
-		//args[0] parentDict
-		String parentDict="";
+		// args[0] parentDict
+		String parentDict = "";
 		String folder = "";
-		//String parentDict = "/Users/piaomz/Downloads/remake-video-project-main/video_rgb/"; 
+		// String parentDict =
+		// "/Users/piaomz/Downloads/remake-video-project-main/video_rgb/";
 		// String parentDict = "C:/Users/14048/Desktop/multimedia/project/video_rgb/";
-		//args[1] folder
-		if(args.length==1){
-			parentDict =args[0];
-			//folder = args[1];
-		}else if(args.length==2){
-			parentDict =args[0];
+		// args[1] folder
+		if (args.length == 1) {
+			parentDict = args[0];
+			// folder = args[1];
+		} else if (args.length == 2) {
+			parentDict = args[0];
 			folder = args[1];
-		}else{
+		} else {
 			System.out.println("missing parameters");
 		}
-		
-		//String folder = "SAL_490_270_437";
+
+		// String folder = "SAL_490_270_437";
 		// String folder = "Stairs_490_270_346";
 		// String folder = "video1_240_424_518";
 		// String folder = "video2_240_424_383";
@@ -366,7 +370,7 @@ public class RGB2PNG {
 
 		VD.run();
 		System.exit(0);
-		
+
 	}
 
 }

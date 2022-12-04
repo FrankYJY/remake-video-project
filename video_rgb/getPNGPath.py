@@ -1,6 +1,7 @@
 import os
 
 def runJavaRGB2PNG(parentDict,folder):
+  # parameters eg: 'C:/Users/14048/Desktop/multimedia/project/video_rgb/', 'SAL_490_270_437'
   if not os.path.exists("RGB2PNG.class"):
     os.system("javac RGB2PNG.java")
   os.system("java RGB2PNG "+ parentDict + ' ' + folder)
