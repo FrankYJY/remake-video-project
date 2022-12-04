@@ -24,12 +24,12 @@ def cluster(points,eps=1,n_clusters=2):
     for item in selectPoints:
         if(((item[0]-xmean)*(item[0]-xmean)+(item[1]-ymean)*(item[1]-ymean))>1280):
             item[2]=0
-    selectedPoints=[]
     '''
-    # for item in selectPoints:
-    #     if(item[2]==1):
-    #         selectedPoints.append((item[0],item[1]))
-    features = points
+    selectedPoints=[]
+    for item in selectPoints:
+        if(item[2]==1):
+            selectedPoints.append((item[0],item[1]))
+    features = selectedPoints
     scaler = StandardScaler()
     #scaled_features = scaler.fit_transform(features)
     

@@ -1,54 +1,78 @@
 from motion_vector import *
 from getPNGPath import *
 from cluster import *
+from convertviedo import *
 
 if __name__ == "__main__":
     # test.py arg1 arg2
-    if len(sys.argv) == 2:
-        directory = sys.argv[1]
-        # sys.argv[2]
-    else:
-        # directory = "C:/Users/14048/Desktop/multimedia/project/video_rgb/SAL_490_270_437"
-        directory = "C:\\Users\\14048\\Desktop\\multimedia\\project\\video_rgb\\Stairs_490_270_346"
-        splitted1 = directory.split("/")
-        splitted2 = []
-        for splitted1_seg in splitted1:
-            splitted2 += splitted1_seg.split("\\")
-        # print(splitted2)
-    # elif len(sys.argv) == 1:
-    #     pass
-    # anchor_path = "C:/Users/14048/Desktop/20221130141838.png"
-    # target_path = "C:/Users/14048/Desktop/20221130141838.png"
-    # main(anchorPath, targetPath, saveOutput=True)
-    parent_dict = "/".join(splitted2[:-1]) 
-    main_folder = splitted2[-1]
+    ##############
 
-    png_path_prefix = parent_dict + "/" + main_folder + "/" + main_folder
+    input_type = "vid"
 
-    dict_info = main_folder.split("_")
-    width = int(dict_info[1])
-    height = int(dict_info[2])
-    frame_num = int(dict_info[3])
+    if input_type == "img":
+        # image
+        if len(sys.argv) == 2:
+            directory = sys.argv[1]
+            # sys.argv[2]
+        else:
+            # directory = "C:/Users/14048/Desktop/multimedia/project/video_rgb/SAL_490_270_437"
+            directory = "C:\\Users\\14048\\Desktop\\multimedia\\project\\video_rgb\\Stairs_490_270_346"
+            splitted1 = directory.split("/")
+            splitted2 = []
+            for splitted1_seg in splitted1:
+                splitted2 += splitted1_seg.split("\\")
+            # print(splitted2)
+        # elif len(sys.argv) == 1:
+        #     pass
+        # anchor_path = "C:/Users/14048/Desktop/20221130141838.png"
+        # target_path = "C:/Users/14048/Desktop/20221130141838.png"
+        # main(anchorPath, targetPath, saveOutput=True)
+        parent_dict = "/".join(splitted2[:-1]) 
+        main_folder = splitted2[-1]
 
-    if not os.path.exists(parent_dict+"/"+main_folder+"/"+main_folder+".001.png"):
-        runJavaRGB2PNG(parent_dict+"/", main_folder)
+        png_path_prefix = parent_dict + "/" + main_folder + "/" + main_folder
+
+        dict_info = main_folder.split("_")
+        width = int(dict_info[1])
+        height = int(dict_info[2])
+        frame_num = int(dict_info[3])
+
+        if not os.path.exists(parent_dict+"/"+main_folder+"/"+main_folder+".001.png"):
+            runJavaRGB2PNG(parent_dict+"/", main_folder)
+
+    elif input_type == "vid":
+        ##############
+        # video
+        video_path = "../video_view/SAL.mp4"
+        video_path = "D:\\chrome downloads\\final_demo_data\\final_demo_data/test1.mp4"
+        frames, fps = convert_video_2_bgra(video_path)
+        frame_num = len(frames)
 
     if_calculate_prediction_and_output = True
 
-    block_size = 16
+    block_size = 32
     search_expand_length = 16
-    frame_predict_step = 10
+    frame_predict_step = 5
     search_method = "h"  # h for hierarchical b for brute force
+
+
+
     for frame_idx_0 in range(frame_num-frame_predict_step):
         print("calculating motion vector" + str(frame_idx_0))
         frame_idx_1 = frame_idx_0 + frame_predict_step
-        frame_idx_0_path = png_path_prefix + "."+  "{:03d}".format(frame_idx_0 + 1) + ".png"
-        frame_idx_1_path = png_path_prefix + "."+  "{:03d}".format(frame_idx_1 + 1) + ".png"
-        frame_n0 = cv2.imread(frame_idx_0_path)
-        frame_n1 = cv2.imread(frame_idx_1_path)
+        if input_type == "img":
+            frame_idx_0_path = png_path_prefix + "."+  "{:03d}".format(frame_idx_0 + 1) + ".png"
+            frame_idx_1_path = png_path_prefix + "."+  "{:03d}".format(frame_idx_1 + 1) + ".png"
+            frame_n0 = cv2.imread(frame_idx_0_path)
+            frame_n1 = cv2.imread(frame_idx_1_path)
+        elif input_type == "vid":
+            frame_n0 = frames[frame_idx_0]
+            frame_n1 = frames[frame_idx_1]
 
-        frame_n0 = cv2.resize(frame_n0, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
-        frame_n1 = cv2.resize(frame_n1, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
+        frame_n0 = cv2.resize(frame_n0, (len(frame_n0[0])//2, len(frame_n0)//2), interpolation=cv2.INTER_LINEAR)
+        frame_n1 = cv2.resize(frame_n1, (len(frame_n1[0])//2, len(frame_n1)//2), interpolation=cv2.INTER_LINEAR)
+        # frame_n0 = cv2.resize(frame_n0, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
+        # frame_n1 = cv2.resize(frame_n1, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
         # preprocess_a_frame_size_inplace(frame_n0, block_size)
 
         frame_n0 = preprocess_a_frame_size(frame_n0, block_size, resizeT_cutoutF=True) # here is blockized

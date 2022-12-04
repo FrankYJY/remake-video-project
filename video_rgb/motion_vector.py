@@ -370,7 +370,7 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, metho
             # multiple candidates usually adjacent, take average
             if len(best_matches) > 1:
                 # print before set avg to position 0
-                print("multiple best candidates SAD", SAD, best_matches)
+                print("multiple best candidates SAD", SAD, best_matches, "at", y, x)
                 temp0 = 0
                 temp1 = 0
                 templ = len(best_matches)
@@ -459,7 +459,14 @@ def draw_a_line_on_predicted(h, w, d, vector_y, vector_x, block_size, motion_vec
     error = deltax//2
     y = y0
     ystep = 1 if y0<y1 else -1
-    color = [0,255,0]
+    if d == 1:
+        color = 255
+    elif d == 3:
+        color = [0,255,0]
+    elif d == 4:
+        color = [0, 255, 0, 255]
+    else:
+        raise Exception("color depth neither 1 or 3, in drawing line in prediction")
     for x in range(x0, x1):
         if steep:
             #(y,x) is position following (x, y) format
@@ -518,9 +525,9 @@ if __name__ == "__main__":
 
     # SAL_490_270_437
     # Stairs_490_270_346
-    parent_dict = "C:\\Users\\14048\\Desktop\\multimedia\\project\\video_rgb\\Stairs_490_270_346/"
-    frame_idx_0_path = parent_dict + "Stairs_490_270_346.010.png"
-    frame_idx_1_path = parent_dict + "Stairs_490_270_346.015.png"
+    # parent_dict = "C:\\Users\\14048\\Desktop\\multimedia\\project\\video_rgb\\Stairs_490_270_346/"
+    # frame_idx_0_path = parent_dict + "Stairs_490_270_346.010.png"
+    # frame_idx_1_path = parent_dict + "Stairs_490_270_346.015.png"
 
 
     # runJavaRGB2PNG('C:/Users/14048/Desktop/multimedia/project/video_rgb/', 'Stairs_490_270_346')
@@ -538,7 +545,7 @@ if __name__ == "__main__":
     frame_n1_Y_blockized = frame_n1
     # frame_n0_Y_blockized = preprocess_a_frame_to_Y(frame_n0, block_size)
     # frame_n1_Y_blockized = preprocess_a_frame_to_Y(frame_n1, block_size)
-    motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, "h", search_expand_length, if_calculate_prediction_and_output)
+    motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, "b", search_expand_length, if_calculate_prediction_and_output)
     if if_calculate_prediction_and_output:
         draw_line_on_predicted(predicted, motion_vector_matrix, block_size)
         save_intermediate_images(frame_n1_Y_blockized, predicted, idx = temp_store_predicted_in_index)

@@ -21,8 +21,8 @@ def getPNGPathes():
   
 if __name__ == "__main__":
   #your path
-  parentDict="" #可以不填 如果该py文件和folder同级
-  folder = "SAL_490_270_437"
+  parentDict="C:/Users/14048/Desktop/multimedia/project/video_rgb/" #可以不填 如果该py文件和folder同级
+  folder = "motiontestimg_490_270_003"
 
   runJavaRGB2PNG(parentDict,folder)
   frameNumber,pngPaths= getPNGPathes()
