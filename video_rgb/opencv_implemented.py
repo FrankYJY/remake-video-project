@@ -30,6 +30,9 @@ def lucas_kanade_method(video_path):
         p1, st, err = cv2.calcOpticalFlowPyrLK(
             old_gray, frame_gray, p0, None, **lk_params
         )
+        # p1, st, err = cv2.calcOpticalFlowPyrLK(
+        #     old_frame, frame, p0, None, **lk_params
+        # )
         # Select good points
         good_new = p1[st == 1]
         good_old = p0[st == 1]
@@ -120,9 +123,9 @@ def main():
 
     video_path = "C:/Users/14048/Desktop/multimedia/project/video_view/Stairs_compact.mp4"
 
-    lucas_kanade_method(video_path)
-    # method = cv2.optflow.calcOpticalFlowSparseToDense
-    # dense_optical_flow(method, video_path, to_gray=False)
+    # lucas_kanade_method(video_path)
+    method = cv2.optflow.calcOpticalFlowSparseToDense
+    dense_optical_flow(method, video_path, to_gray=False)
 
 
 if __name__ == "__main__":

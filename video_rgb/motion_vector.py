@@ -247,7 +247,7 @@ def hierarchical_search(base_block, area_to_searched, block_size, search_expand_
     # print(res, candidates_SAD_min[0])
     return res, candidates_SAD_min[0]
 
-def maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, y_of_candidate, x_of_candidate, max_best_candidates_per_level, best_candidates_SAD_no_bigger_than_minSAD_tolerate_range):
+def maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, candidates_SAD_min, first_val_of_candidate, second_val_of_candidate, max_best_candidates_per_level, best_candidates_SAD_no_bigger_than_minSAD_tolerate_range):
     if candidates_SAD_max[0] == 0:
         # cache is filled with SAE=0 candidates, do not insert
         return
@@ -257,7 +257,7 @@ def maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, ca
                 index_to_pop = candidates_SADs.index(candidates_SAD_max[0])
                 candidates.pop(index_to_pop)
                 candidates_SADs.pop(index_to_pop)
-            candidates.append((y_of_candidate, x_of_candidate))
+            candidates.append((first_val_of_candidate, second_val_of_candidate))
             candidates_SADs.append(SAD)
             if candidates_SAD_max[0] == math.inf:
                 candidates_SAD_max[0] = 0
@@ -273,10 +273,10 @@ def maintain_candidates(SAD, candidates, candidates_SADs, candidates_SAD_max, ca
     elif max_best_candidates_per_level == 1:
         if len(candidates_SADs) == 0:
             candidates_SADs.append(SAD)
-            candidates.append((y_of_candidate, x_of_candidate))
+            candidates.append((first_val_of_candidate, second_val_of_candidate))
         if SAD < candidates_SADs[0]:
             candidates_SADs[0] = SAD
-            candidates[0] = (y_of_candidate, x_of_candidate)
+            candidates[0] = (first_val_of_candidate, second_val_of_candidate)
         # print(SAD, candidates_SADs, candidates_SAD_min, candidates_SAD_max)
 
 def optimized_brute_force_search(base_block, area_to_searched, block_size, search_expand_length, max_best_candidates_per_level = 1, best_candidates_SAD_no_bigger_than_minSAD_tolerate_range = 500):
@@ -350,7 +350,7 @@ def get_search_area(x, y, frame, block_size, search_expand_length):
     search_area = frame[sy:min(y+search_expand_length+block_size, h), sx:min(x+search_expand_length+block_size, w)]
     return search_area, [sy, min(y+search_expand_length+block_size, h), sx, min(x+search_expand_length+block_size, w)]
 
-def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, method = "h", search_expand_length=16, if_generate_predict_frames = False):
+def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, method = "h", search_expand_length=16, max_best_candidates_per_level = 10, if_generate_predict_frames = False):
     #                            frame n             frame n+1                search_expand_length must be multiple of block_size
     #                                                                      h: hierarchical  b: brute force
     # search  frame_base n+1       in     frame_being_searched n
@@ -368,8 +368,6 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, metho
     blockized_h, blockized_w = get_blockized_height_width(frame_being_searched, block_size)
     bcount = 0
     matrix = [[None for i in range(w//block_size)] for j in range(h//block_size)]
-
-    max_best_candidates_per_level = 10
 
     # for each block
     for y in range(0, blockized_h, block_size):
@@ -394,7 +392,7 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, metho
             # multiple candidates usually adjacent, take average
             if len(best_matches) > 1:
                 # print before set avg to position 0
-                print("multiple best candidates SAD", SAD, best_matches, "at", y, x)
+                print("multiple best candidates dx dy in block, minus expand length later, SAD", SAD, best_matches, "at", y, x)
                 temp0 = 0
                 temp1 = 0
                 templ = len(best_matches)

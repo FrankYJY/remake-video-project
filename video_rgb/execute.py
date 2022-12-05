@@ -55,6 +55,7 @@ if __name__ == "__main__":
     block_size = 16
     search_expand_length = 16
     frame_predict_step = 20
+    max_best_candidates_per_level = 10
     # block_size = 32
     # search_expand_length = 32
     # frame_predict_step = 4
@@ -94,7 +95,7 @@ if __name__ == "__main__":
         # frame_n1_Y_blockized = preprocess_a_frame_to_Y(frame_n1, block_size)
         frame_n0_Y_blockized = preprocess_a_frame_to_HSV(frame_n0, block_size)
         frame_n1_Y_blockized = preprocess_a_frame_to_HSV(frame_n1, block_size)
-        motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, search_method, search_expand_length, if_calculate_prediction_and_output)
+        motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, search_method, search_expand_length, max_best_candidates_per_level, if_calculate_prediction_and_output)
         if if_calculate_prediction_and_output:
             draw_line_on_predicted(predicted, motion_vector_matrix, block_size)
             save_intermediate_images(frame_n1_Y_blockized, predicted, idx = frame_idx_0)
@@ -120,6 +121,30 @@ if __name__ == "__main__":
         print(Counter(dydx_tuples))
         # print(cluster_data)
 
+        ##############
+        # threshold splitting
+        # motion_difference_threshold = [5, 5, 1000]
+
+        # count_on_dx_dy = collections.defaultdict(int)
+        # max_count = 0
+        # a_block_x_y_of_max_count = None
+        
+        # for h in range(len(motion_vector_matrix)):
+        #     for w in range(len(motion_vector_matrix[0])):
+        #         cur_dx_dy = (motion_vector_matrix[h][w][0][0], motion_vector_matrix[h][w][0][1])
+        #         count_on_dx_dy[cur_dx_dy] += 1
+        #         if count_on_dx_dy[cur_dx_dy] > max_count:
+        #             max_count = count_on_dx_dy[cur_dx_dy]
+        #             a_block_x_y_of_max_count = cur_dx_dy
+        
+        # # a_block_x_y_of_max_count is now search start as background
+        # blocks_class_mask = [[0 for i in range(len(motion_vector_matrix[0]))] for j in range(len(motion_vector_matrix))]
+        # for h in range(len(motion_vector_matrix)):
+        #     for w in range(len(motion_vector_matrix[0])):
+
+
+        ##############
+        # clustering
 
         #motion_vector_matrix = motion_vector_matrix[1:motion_vector_matrix_h-1,1:motion_vector_matrix_w-1,:,:]
         frame_n0_h = len(frame_n0)
