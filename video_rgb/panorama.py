@@ -7,24 +7,40 @@ def drawCircle(image,p,color):
 def drawPanorama(imageNext,p,image,d):
     p1,p2,p3,p4 = p
     d1,d2,d3,d4 = d
+    #imageNext is bigger and is panorama
     height,width = image.shape[:2]
     #print(height,width)
-    imageNext = cv2.copyMakeBorder(imageNext, 0 , height-imageNext.shape[0],0, width-imageNext.shape[1] , cv2.BORDER_CONSTANT, value=[0, 0, 0,0])
-    #heights,widths = imageNext.shape[:2]
+    heightN,widthN = imageNext.shape[:2]
+    maxHeight=max(height,heightN)
+    maxWidth = max(width,widthN)
+    #height = maxHeight
+    #width = maxWidth
+    image = cv2.copyMakeBorder(image, 0 , max(0,maxHeight-image.shape[0]),0, max(0,maxWidth-image.shape[1]) , cv2.BORDER_CONSTANT, value=[0, 0, 0,0])
+    imageNext = cv2.copyMakeBorder(imageNext, 0 , max(0,maxHeight-imageNext.shape[0]),0, max(0,maxWidth-imageNext.shape[1]) , cv2.BORDER_CONSTANT, value=[0, 0, 0,0])
+    #print("aaaa")
+    #print(image.shape[:2])
+    #print(imageNext.shape[:2])
     #print(heights,widths)
     
     copied = np.copy(image)
+    #cv2.namedWindow("image", cv2.WINDOW_NORMAL)    
+    #cv2.imshow("image",copied)
+    #cv2.namedWindow("imageNext", cv2.WINDOW_NORMAL)    
+    #cv2.imshow("imageNext", imageNext)
+    #cv2.waitKey(0) # waits until a key is pressed
+    #cv2.destroyAllWindows() # destroys the window showing image
+    
     tlp=[[0],[0],[1]]
-    trp = [[width],[0],[1]]
-    blp=[[0],[height],[1]]
-    brp=[[width],[height],[1]]
+    trp = [[widthN],[0],[1]]
+    blp=[[0],[heightN],[1]]
+    brp=[[widthN],[heightN],[1]]
     borderPoint= [tlp,trp,blp,brp]
     '''
     for p in borderPoint:
         #point = (p[0][0],p[1][0])
         #drawCircle(copied,point,color=(255,0,0))
         pass
-    '''
+    
     for p in [p1,p2,p3,p4]:
         drawCircle(imageNext,p,color=(0,0,255))
         pass
@@ -32,11 +48,11 @@ def drawPanorama(imageNext,p,image,d):
     for p in [d1,d2,d3,d4]:
         drawCircle(copied,p,color=(0,255,0))
         pass
-    
-    cv2.namedWindow("image", cv2.WINDOW_NORMAL)    
-    cv2.imshow("image",copied)
-    cv2.namedWindow("imageNext", cv2.WINDOW_NORMAL)    
-    cv2.imshow("imageNext", imageNext)
+    '''
+    #cv2.namedWindow("image", cv2.WINDOW_NORMAL)    
+    #cv2.imshow("image",copied)
+    #cv2.namedWindow("imageNext", cv2.WINDOW_NORMAL)    
+    #cv2.imshow("imageNext", imageNext)
     #cv2.waitKey(0) # waits until a key is pressed
     #cv2.destroyAllWindows() # destroys the window showing image
     #return 0
@@ -46,8 +62,8 @@ def drawPanorama(imageNext,p,image,d):
     transformMatrix= cv2.getPerspectiveTransform(src,des)
 
     #print(transformMatrix)
-    xborder = [0,width]
-    yborder = [0,height]
+    xborder = [0,maxWidth]
+    yborder = [0,maxHeight]
     for p in borderPoint:
         tp = np.dot(transformMatrix,np.float32(p))
         tp = tp/tp[2][0]
@@ -57,10 +73,21 @@ def drawPanorama(imageNext,p,image,d):
         #drawCircle(correctedImage,(int(tp[0][0]),int(tp[1][0])),color=(255,0,0))
     #print(xborder,yborder)
     #print(min(xborder), (max(xborder)-width), min(yborder), max(yborder)-height)
-    copied = cv2.copyMakeBorder(copied, int(abs(min(yborder))), int(abs(max(yborder)-height)),int(abs(min(xborder))),int(abs(max(xborder)-width)) , cv2.BORDER_CONSTANT, value=[0, 0, 0,0])
-    imageNext = cv2.copyMakeBorder(imageNext, int(abs(min(yborder))), int(abs(max(yborder)-height)),int(abs(min(xborder))),int(abs(max(xborder)-width)) , cv2.BORDER_CONSTANT, value=[0, 0, 0,0])
-    centerPoint= [int(abs(min(yborder))),int(abs(min(xborder)))] 
+    #print("MakeBorder Size:")
     #print(copied.shape[:2])
+    copied = cv2.copyMakeBorder(copied, int(abs(min(yborder))), int(abs(max(yborder)-maxHeight)),int(abs(min(xborder))),int(abs(max(xborder)-maxWidth)) , cv2.BORDER_CONSTANT, value=[0, 0, 0,0])
+    imageNext = cv2.copyMakeBorder(imageNext, int(abs(min(yborder))), int(abs(max(yborder)-maxHeight)),int(abs(min(xborder))),int(abs(max(xborder)-maxWidth)) , cv2.BORDER_CONSTANT, value=[0, 0, 0,0])
+    centerPoint= [int(abs(min(xborder))),int(abs(min(yborder)))] 
+    #print("aaaa")
+    #print(yborder,xborder)
+    #print(copied.shape[:2])
+    #print(imageNext.shape[:2])
+    #cv2.namedWindow("image", cv2.WINDOW_NORMAL)    
+    #cv2.imshow("image",copied)
+    #cv2.namedWindow("imageNext", cv2.WINDOW_NORMAL)    
+    #cv2.imshow("imageNext", imageNext)
+    #cv2.waitKey(0) # waits until a key is pressed
+    #cv2.destroyAllWindows() # destroys the window showing image
     p1=(p1[0]+int(abs(min(xborder))),p1[1]+int(abs(min(yborder))))
     p2=(p2[0]+int(abs(min(xborder))),p2[1]+int(abs(min(yborder))))
     p3=(p3[0]+int(abs(min(xborder))),p3[1]+int(abs(min(yborder))))
@@ -90,10 +117,11 @@ def drawPanorama(imageNext,p,image,d):
         for h in range(height):
             if(correctedImage[h][w][3]!=0):
                 if(copied[h][w][3]!=0):
-                    copied[h][w]=copied[h][w]//[2,2,2,2]+correctedImage[h][w]//[2,2,2,2]
-                    #copied[h][w]=copied[h][w]
                     countdiff+=1
                     difference = sum([abs(int(copied[h][w][i])-int(correctedImage[h][w][i])) for i in range(3)])
+                    #copied[h][w]=copied[h][w]//[2,2,2,2]+correctedImage[h][w]//[2,2,2,2]
+                    #copied[h][w]=copied[h][w]
+                    copied[h][w]=correctedImage[h][w]
                 else:
                     copied[h][w]=correctedImage[h][w]
                     
@@ -107,6 +135,7 @@ def drawPanorama(imageNext,p,image,d):
     #cv2.imshow("imageNext", imageNext)
     #cv2.waitKey(0) # waits until a key is pressed
     #cv2.destroyAllWindows() # destroys the window showing image
+    print(centerPoint)
     return copied, difference,centerPoint
 
 
@@ -114,31 +143,32 @@ def getTransformMatrix(p1,p2,p3,p4,d1,d2,d3,d4):
     src = np.float32([p1,p2,p3,p4])
     des = np.float32([d1,d2,d3,d4])
     return cv2.getPerspectiveTransform(src,des)
-def generatePanoramaCandidate(image,ps,prePanorama,ds):
+def generatePanoramaCandidate(image,ps,nowPanorama,ds):
     panoramas=[]
     diffs=[]
     centerPoints=[]
     for i in range(len(ps)):
         print("calculate panorama candidate "+str(i))
-        panorama, diff, centerPoint = drawPanorama(image,ps[i],prePanorama,ds[i])
+        panorama, diff, centerPoint = drawPanorama(nowPanorama,ds[i],image,ps[i])
         panoramas.append(panorama)
         diffs.append(diff)
         centerPoints.append(centerPoint)
     print("differences of candidate panorama"+str(diffs))
     finalpanorama = panoramas[diffs.index(min(diffs))]
     finalCenterPoint = centerPoints[diffs.index(min(diffs))]
-    cv2.namedWindow("finalpanorama", cv2.WINDOW_NORMAL)    
-    cv2.imshow("finalpanorama",finalpanorama)
-    cv2.waitKey(0) # waits until a key is pressed
-    cv2.destroyAllWindows() # destroys the window showing image
+    print(str(diffs.index(min(diffs)))+" selected")
+    #cv2.namedWindow("finalpanorama", cv2.WINDOW_NORMAL)    
+    #cv2.imshow("finalpanorama",finalpanorama)
+    #cv2.waitKey(0) # waits until a key is pressed
+    #cv2.destroyAllWindows() # destroys the window showing image
     return finalpanorama,finalCenterPoint
-def getFourPoints(motion_vector_matrix,extracted_frame_n1_RGBA_s,block_size,borderSize):
+def getFourPoints(motion_vector_matrix,extracted_frame_n1_RGBA_s,block_size,borderSize,centerPoint):
     #resp=[]
     #resd=[]
     background = extracted_frame_n1_RGBA_s[0]
-    meany = 0
-    meanx = 0
-    count=0
+    #meany = 0
+    #meanx = 0
+    #count=0
     allBackgroundPos=[]
     top=[len(motion_vector_matrix),0]
     bottom=[0,len(motion_vector_matrix[0])]
@@ -150,9 +180,9 @@ def getFourPoints(motion_vector_matrix,extracted_frame_n1_RGBA_s,block_size,bord
     rightd=[0,0]
     for h in range(borderSize,len(motion_vector_matrix)-borderSize):
         for w in range(borderSize,len(motion_vector_matrix[0])-borderSize):
-            count +=1
-            meany += motion_vector_matrix[h][w][0][0]
-            meanx += motion_vector_matrix[h][w][0][1]
+            #count +=1
+            #meany += motion_vector_matrix[h][w][0][0]
+            #meanx += motion_vector_matrix[h][w][0][1]
             center = [h*block_size+block_size//2,w*block_size+block_size//2]
             if(background[center[0]][center[1]][3]!=0):
                 if(top[0]>h):
@@ -168,25 +198,25 @@ def getFourPoints(motion_vector_matrix,extracted_frame_n1_RGBA_s,block_size,bord
                     right = [h,w]
                     rightd = [motion_vector_matrix[h][w][0][0],motion_vector_matrix[h][w][0][1]]
                 #[motion_vector_matrix[h][w][0][0]],[motion_vector_matrix[h][w][0][0]]  motion vector
-    meany /= count
-    meanx /=count
+    #meany /= count
+    #meanx /=count
     top = [top[1]*block_size+block_size//2,top[0]*block_size+block_size//2]
     bottom = [bottom[1]*block_size+block_size//2,bottom[0]*block_size+block_size//2]
     left = [left[1]*block_size+block_size//2,left[0]*block_size+block_size//2]
     right =[right[1]*block_size+block_size//2,right[0]*block_size+block_size//2]
-    print([top,bottom,left,right])
-    print([topd,bottomd,leftd,rightd])
+    #print([top,bottom,left,right])
+    #print([topd,bottomd,leftd,rightd])
     direction=-1
     if(direction==0):
-        topd=[top[0]+topd[1],top[1]+topd[0]]
-        bottomd=[bottom[0]+bottomd[1],bottom[1]+bottomd[0]]
-        leftd=[left[0]+leftd[1],left[1]+leftd[0]]
-        rightd=[right[0]+rightd[1],right[1]+rightd[0]]
+        topd=[top[0]+topd[1]+centerPoint[0],top[1]+topd[0]+centerPoint[1]]
+        bottomd=[bottom[0]+bottomd[1]+centerPoint[0],bottom[1]+bottomd[0]+centerPoint[1]]
+        leftd=[left[0]+leftd[1]+centerPoint[0],left[1]+leftd[0]+centerPoint[1]]
+        rightd=[right[0]+rightd[1]+centerPoint[0],right[1]+rightd[0]+centerPoint[1]]
     else:
-        topd=[top[0]-topd[1],top[1]-topd[0]]
-        bottomd=[bottom[0]-bottomd[1],bottom[1]-bottomd[0]]
-        leftd=[left[0]-leftd[1],left[1]-leftd[0]]
-        rightd=[right[0]-rightd[1],right[1]-rightd[0]]
+        topd=[top[0]-topd[1]+centerPoint[0],top[1]-topd[0]+centerPoint[1]]
+        bottomd=[bottom[0]-bottomd[1]+centerPoint[0],bottom[1]-bottomd[0]+centerPoint[1]]
+        leftd=[left[0]-leftd[1]+centerPoint[0],left[1]-leftd[0]+centerPoint[1]]
+        rightd=[right[0]-rightd[1]+centerPoint[0],right[1]-rightd[0]+centerPoint[1]]
     
     #resp.append([top,bottom,left,right])
     #resd.append([topd,bottomd,leftd,rightd])
@@ -211,5 +241,8 @@ if __name__ == "__main__":
     prePanorama = cv2.cvtColor(prePanorama, cv2.COLOR_RGB2RGBA)
     image = cv2.imread(path+"image.png")
     image = cv2.cvtColor(image, cv2.COLOR_RGB2RGBA)
-    generatePanoramaCandidate(image,ps,prePanorama,ds)
+    print(prePanorama.shape[:2])
+    print(image.shape[:2])
+    generatePanoramaCandidate(prePanorama,ds,image,ps)
+    
 

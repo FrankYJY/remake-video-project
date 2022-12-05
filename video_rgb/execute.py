@@ -63,7 +63,7 @@ if __name__ == "__main__":
     motion_difference_threshold = [3, 3, 1000]
 
 
-    for frame_idx_0 in range(frame_num-frame_predict_step):
+    for frame_idx_0 in range(0,frame_num-frame_predict_step,frame_predict_step):
         print("calculating motion vector" + str(frame_idx_0))
         frame_idx_1 = frame_idx_0 + frame_predict_step
         if input_type == "img":
@@ -161,21 +161,30 @@ if __name__ == "__main__":
             cv2.imshow("frame_n1_RGBA" + str(label), frame_n1_RGBA)
             #cv2.waitKey(0)
         
-        # ps=[]
-        # ds=[]
-        # for borderSize in range(0,10):
-        #     try:
-        #         p, d = getFourPoints(motion_vector_matrix,extracted_frame_n1_RGBA_s,block_size,borderSize)
-        #         print(p,d)
-        #         #d = [[item[0]+block_size,item[1]+block_size] for item in d]
-        #         ps.append(p)
-        #         ds.append(d)
-        #     except:
-        #         pass      
-        # #print(extracted_frame_n1_RGBA_s[0].shape[:2])
-        # #print(frame_n0.shape[:2])
-        # panorama,centerPoint = generatePanoramaCandidate(extracted_frame_n1_RGBA_s[0],ps,frame_n0,ds)
-        # print(centerPoint)
-        # print(1)
-        # pass
+        ps=[]
+        ds=[]
+        #for borderSize in range(0,10):
+        for borderSize in range(3,4):
+            try:
+                p, d = getFourPoints(motion_vector_matrix,extracted_frame_n1_RGBA_s,block_size,borderSize,centerPoint)
+                #print(p,d)
+                #d = [[item[0]+block_size,item[1]+block_size] for item in d]
+                ps.append(p)
+                ds.append(d)
+            except:
+                pass      
+        #print(extracted_frame_n1_RGBA_s[0].shape[:2])
+        #print(frame_n0.shape[:2])
+        if(wholePanorama.any()==False):
+            wholePanorama=np.copy(extracted_frame_n1_RGBA_s[0])
+        else:
+            wholePanorama,centerPoint = generatePanoramaCandidate(extracted_frame_n1_RGBA_s[0],ps,wholePanorama,ds)
+        cv2.namedWindow("wholepanorama"+str(frame_idx_1), cv2.WINDOW_NORMAL) 
+        cv2.imshow("wholepanorama"+str(frame_idx_1),wholePanorama)
+        cv2.imwrite("paromaraOutput/"+"wholepanorama"+str(frame_idx_1)+".png",wholePanorama)
+        cv2.imwrite("paromaraOutput/"+"background"+str(frame_idx_1)+".png",extracted_frame_n1_RGBA_s[0])
+        #cv2.waitKey(0)
+        #print(centerPoint)
+        #print(1)
+        pass
                 
