@@ -44,9 +44,9 @@ if __name__ == "__main__":
     elif input_type == "vid":
         ##############
         # video
-        video_path = "../video_view/SAL_compact.mp4"
+        #video_path = "../video_view/SAL_compact.mp4"
         # video_path = "D:\\chrome downloads\\final_demo_data\\final_demo_data/test2.mp4"
-        # video_path = "/Users/piaomz/Desktop/CSCI576/final_demo_data/test1.mp4"
+        video_path = "/Users/piaomz/Desktop/CSCI576/final_demo_data/test1.mp4"
         frames, fps = convert_video_2_bgra(video_path)
         frame_num = len(frames)
 
@@ -62,7 +62,8 @@ if __name__ == "__main__":
 
     motion_difference_threshold = [3, 3, 1000]
 
-
+    wholePanorama=np.array([])
+    centerPoint=[0,0]
     for frame_idx_0 in range(0,frame_num-frame_predict_step,frame_predict_step):
         print("calculating motion vector" + str(frame_idx_0))
         frame_idx_1 = frame_idx_0 + frame_predict_step
@@ -181,9 +182,9 @@ if __name__ == "__main__":
             wholePanorama,centerPoint = generatePanoramaCandidate(extracted_frame_n1_RGBA_s[0],ps,wholePanorama,ds)
         cv2.namedWindow("wholepanorama"+str(frame_idx_1), cv2.WINDOW_NORMAL) 
         cv2.imshow("wholepanorama"+str(frame_idx_1),wholePanorama)
-        cv2.imwrite("paromaraOutput/"+"wholepanorama"+str(frame_idx_1)+".png",wholePanorama)
-        cv2.imwrite("paromaraOutput/"+"background"+str(frame_idx_1)+".png",extracted_frame_n1_RGBA_s[0])
-        #cv2.waitKey(0)
+        cv2.imwrite("./paromaraOutput/"+"wholepanorama"+str(frame_idx_1)+".png",wholePanorama)
+        cv2.imwrite("./paromaraOutput/"+"background"+str(frame_idx_1)+".png",extracted_frame_n1_RGBA_s[0])
+        cv2.waitKey(0)
         #print(centerPoint)
         #print(1)
         pass
