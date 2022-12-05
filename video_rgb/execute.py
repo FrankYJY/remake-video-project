@@ -44,9 +44,9 @@ if __name__ == "__main__":
     elif input_type == "vid":
         ##############
         # video
-        #video_path = "../video_view/SAL_compact.mp4"
+        video_path = "../video_view/Finaltest2_compact.mp4"
         # video_path = "D:\\chrome downloads\\final_demo_data\\final_demo_data/test2.mp4"
-        video_path = "/Users/piaomz/Desktop/CSCI576/final_demo_data/test1.mp4"
+        # video_path = "/Users/piaomz/Desktop/CSCI576/final_demo_data/test1.mp4"
         frames, fps = convert_video_2_bgra(video_path)
         frame_num = len(frames)
 
@@ -54,14 +54,16 @@ if __name__ == "__main__":
 
     block_size = 16
     search_expand_length = 16
-    frame_predict_step = 20
+    frame_predict_step = 5
     max_best_candidates_per_level = 10
     # block_size = 32
     # search_expand_length = 32
     # frame_predict_step = 4
     search_method = "h"  # h for hierarchical b for brute force
 
-    motion_difference_threshold = [3, 3, 1000]
+    motion_difference_tolerate_thresholds = [5, 5, 2000]
+    over_this_threshold_count_set_as_search_start_bkg_threshold = 10
+    motion_difference_threshold_search_directions = [(1,0),(0,1),(-1,0),(0,-1)]
 
     wholePanorama=np.array([])
     centerPoint=[0,0]
@@ -124,25 +126,106 @@ if __name__ == "__main__":
 
         ##############
         # threshold splitting
-        # motion_difference_threshold = [5, 5, 1000]
-
-        # count_on_dx_dy = collections.defaultdict(int)
-        # max_count = 0
-        # a_block_x_y_of_max_count = None
         
-        # for h in range(len(motion_vector_matrix)):
-        #     for w in range(len(motion_vector_matrix[0])):
-        #         cur_dx_dy = (motion_vector_matrix[h][w][0][0], motion_vector_matrix[h][w][0][1])
-        #         count_on_dx_dy[cur_dx_dy] += 1
-        #         if count_on_dx_dy[cur_dx_dy] > max_count:
-        #             max_count = count_on_dx_dy[cur_dx_dy]
-        #             a_block_x_y_of_max_count = cur_dx_dy
-        
-        # # a_block_x_y_of_max_count is now search start as background
-        # blocks_class_mask = [[0 for i in range(len(motion_vector_matrix[0]))] for j in range(len(motion_vector_matrix))]
-        # for h in range(len(motion_vector_matrix)):
-        #     for w in range(len(motion_vector_matrix[0])):
 
+        count_on_dy_dx = collections.defaultdict(int)
+        max_count = 0
+        a_block_y_x_of_max_count = None
+
+        motion_vector_matrix_h = len(motion_vector_matrix)
+        motion_vector_matrix_w = len(motion_vector_matrix[0])
+
+        dydx_tuples = []
+        for h in range(motion_vector_matrix_h):
+            for w in range(motion_vector_matrix_w):
+                dydx_tuples.append((motion_vector_matrix[h][w][0][0],motion_vector_matrix[h][w][0][1]))
+        dydx_tuples_counts = Counter(dydx_tuples) # (dy,dx): count
+        descending_dydx_tuples = sorted(dydx_tuples_counts, key=dydx_tuples_counts.get, reverse=True)
+        print(descending_dydx_tuples)
+
+        for h in range(motion_vector_matrix_h):  
+            for w in range(motion_vector_matrix_w):
+                cur_dy_dx = (motion_vector_matrix[h][w][0][0], motion_vector_matrix[h][w][0][1])
+                count_on_dy_dx[cur_dy_dx] += 1
+                if count_on_dy_dx[cur_dy_dx] > max_count:
+                    max_count = count_on_dy_dx[cur_dy_dx]
+                    a_block_y_x_of_max_count = cur_dy_dx
+
+        search_start_candidate_number = 0
+        for i in range(len(descending_dydx_tuples)):
+            if dydx_tuples_counts[descending_dydx_tuples[i]] < over_this_threshold_count_set_as_search_start_bkg_threshold:
+                break
+            else:
+                search_start_candidate_number = i
+
+        search_start_blocks_y_x = []
+        for h in range(motion_vector_matrix_h):  
+            for w in range(motion_vector_matrix_w):
+                for ith_most_count_dy_dx in range(search_start_candidate_number):
+                    if motion_vector_matrix[h][w][0][0] == descending_dydx_tuples[ith_most_count_dy_dx][0] and motion_vector_matrix[h][w][0][1] == descending_dydx_tuples[ith_most_count_dy_dx][1]:
+                        search_start_blocks_y_x.append((h,w))
+                        break
+        
+        
+        # a_block_x_y_of_max_count is now search start as background, 2 not searched, 1 is obj, 0 is bkg
+        blocks_class_mask = [[2 for i in range(motion_vector_matrix_w)] for j in range(motion_vector_matrix_h)]
+        for start_y_x in search_start_blocks_y_x:
+            blocks_class_mask[start_y_x[0]][start_y_x[1]] = 0
+
+        # bfs search all the unsearched neigibours, if over tolerant range set as object
+        q = collections.deque(search_start_blocks_y_x)
+        while q:
+            cur_i, cur_j = q.popleft()
+            for direction in motion_difference_threshold_search_directions:
+                nei_i = cur_i + direction[0]
+                nei_j = cur_j + direction[1]
+                if 0 <= nei_i < motion_vector_matrix_h and 0 <= nei_j < motion_vector_matrix_w:
+                    if blocks_class_mask[nei_i][nei_j] == 2:# not searched
+                        is_in_range = True
+                        for i in range(len(motion_difference_tolerate_thresholds)):
+                            threshold = motion_difference_tolerate_thresholds[i]
+                            if abs(motion_vector_matrix[cur_i][cur_j][0][i] - motion_vector_matrix[nei_i][nei_j][0][i]) > threshold:
+                                # out of range
+                                is_in_range = False
+                                blocks_class_mask[nei_i][nei_j] = 1
+                                break
+                        if is_in_range:
+                            # q.append((nei_i, nei_j))
+                            blocks_class_mask[nei_i][nei_j] = 0
+
+        # check all not searched if so steep from others
+        # vote from neighbours
+        for cur_i in range(motion_vector_matrix_h):
+            for cur_j in range(motion_vector_matrix_w):
+                if blocks_class_mask[cur_i][cur_j] == 2:# not searched
+                    neighbour_num = 0
+                    vote_value = 0
+                    for direction in motion_difference_threshold_search_directions:
+                        nei_i = cur_i + direction[0]
+                        nei_j = cur_j + direction[1]
+                        if 0 <= nei_i < motion_vector_matrix_h and 0 <= nei_j < motion_vector_matrix_w:
+                            neighbour_num += 1 # nei exist
+                            vote_value += blocks_class_mask[nei_i][nei_j]
+                    if vote_value >= neighbour_num/2:
+                        blocks_class_mask[cur_i][cur_j] = 1
+                    else:
+                        blocks_class_mask[cur_i][cur_j] = 0
+        
+        frame_n1_RGBA_base = cv2.cvtColor(frame_n1, cv2.COLOR_RGB2RGBA)
+        extracted_frame_n1_RGBA_s = []
+        for mask_label in [0,1,2]:
+            frame_n1_RGBA = frame_n1_RGBA_base.copy()
+            for w in range(frame_n1_RGBA.shape[1]):
+                for h in range(frame_n1_RGBA.shape[0]):
+                    h_idx = h // block_size
+                    w_idx = w // block_size
+                    if blocks_class_mask[h_idx][w_idx] == mask_label:
+                        frame_n1_RGBA[h][w][3] = 255
+                    else:
+                        frame_n1_RGBA[h][w] = [0, 0, 0, 0]
+            extracted_frame_n1_RGBA_s.append(frame_n1_RGBA)
+            cv2.imshow("frame_n1_RGBA" + str(mask_label), frame_n1_RGBA)
+        cv2.waitKey(0)
 
         ##############
         # clustering
