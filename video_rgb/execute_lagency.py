@@ -45,7 +45,7 @@ if __name__ == "__main__":
         ##############
         # video
         video_path = "../video_view/SAL.mp4"
-        video_path = "/Users/piaomz/Desktop/CSCI576/final_demo_data/test1.mp4"
+        video_path = "/Users/piaomz/Desktop/CSCI576/final_demo_data/test2.mp4"
         frames, fps = convert_video_2_bgra(video_path)
         frame_num = len(frames)
 
@@ -156,8 +156,8 @@ if __name__ == "__main__":
             wholePanorama,centerPoint,transformMatrix = generatePanoramaCandidate(extracted_frame_n1_RGBA_s[0],ps,wholePanorama,ds,transformMatrix)
         cv2.namedWindow("wholepanorama"+str(frame_idx_1), cv2.WINDOW_NORMAL) 
         cv2.imshow("wholepanorama"+str(frame_idx_1),wholePanorama)
-        cv2.imwrite("./paromaraOutput/"+"wholepanorama"+str(frame_idx_1)+".png",wholePanorama)
-        cv2.imwrite("./paromaraOutput/"+"background"+str(frame_idx_1)+".png",extracted_frame_n1_RGBA_s[0])
+        cv2.imwrite("./panoramaOutput/"+"wholepanorama"+str(frame_idx_1)+".png",wholePanorama)
+        cv2.imwrite("./panoramaOutput/"+"background"+str(frame_idx_1)+".png",extracted_frame_n1_RGBA_s[0])
         #cv2.waitKey(0)
         #print(centerPoint)
         #print(1)
