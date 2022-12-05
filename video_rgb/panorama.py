@@ -109,7 +109,7 @@ def drawPanorama(imageNext,p,image,d):
     #print(src,des)
     transformMatrix= cv2.getPerspectiveTransform(src,des)
     height,width = imageNext.shape[:2]
-    correctedImage = cv2.warpPerspective(imageNext,transformMatrix,(width,height),borderValue=(0,0,0,0))
+    correctedImage = cv2.warpPerspective(imageNext,transformMatrix,(width,height),borderValue=(0,0,0,0),flags=cv2.INTER_NEAREST)
     difference = 0 
     countdiff=0
     #print(1)
@@ -121,7 +121,7 @@ def drawPanorama(imageNext,p,image,d):
                     difference = sum([abs(int(copied[h][w][i])-int(correctedImage[h][w][i])) for i in range(3)])
                     #copied[h][w]=copied[h][w]//[2,2,2,2]+correctedImage[h][w]//[2,2,2,2]
                     #copied[h][w]=copied[h][w]
-                    copied[h][w]=correctedImage[h][w]
+                    copied[h][w]=copied[h][w]
                 else:
                     copied[h][w]=correctedImage[h][w]
                     
@@ -136,32 +136,36 @@ def drawPanorama(imageNext,p,image,d):
     #cv2.waitKey(0) # waits until a key is pressed
     #cv2.destroyAllWindows() # destroys the window showing image
     print(centerPoint)
-    return copied, difference,centerPoint
+    return copied, difference,centerPoint,transformMatrix
 
 
 def getTransformMatrix(p1,p2,p3,p4,d1,d2,d3,d4):
     src = np.float32([p1,p2,p3,p4])
     des = np.float32([d1,d2,d3,d4])
     return cv2.getPerspectiveTransform(src,des)
-def generatePanoramaCandidate(image,ps,nowPanorama,ds):
+def generatePanoramaCandidate(image,ps,nowPanorama,ds,tfm):
     panoramas=[]
     diffs=[]
     centerPoints=[]
+    transformMatrixs=[]
     for i in range(len(ps)):
         print("calculate panorama candidate "+str(i))
-        panorama, diff, centerPoint = drawPanorama(nowPanorama,ds[i],image,ps[i])
+        panorama, diff, centerPoint,transformMatrix = drawPanorama(nowPanorama,ds[i],image,ps[i])
         panoramas.append(panorama)
         diffs.append(diff)
         centerPoints.append(centerPoint)
+        transformMatrixs.append(transformMatrix)
     print("differences of candidate panorama"+str(diffs))
     finalpanorama = panoramas[diffs.index(min(diffs))]
     finalCenterPoint = centerPoints[diffs.index(min(diffs))]
+    finalTransformMatrix = transformMatrixs[diffs.index(min(diffs))]
+    tfm.append(finalTransformMatrix)
     print(str(diffs.index(min(diffs)))+" selected")
     #cv2.namedWindow("finalpanorama", cv2.WINDOW_NORMAL)    
     #cv2.imshow("finalpanorama",finalpanorama)
     #cv2.waitKey(0) # waits until a key is pressed
     #cv2.destroyAllWindows() # destroys the window showing image
-    return finalpanorama,finalCenterPoint
+    return finalpanorama,finalCenterPoint,tfm
 def getFourPoints(motion_vector_matrix,extracted_frame_n1_RGBA_s,block_size,borderSize,centerPoint):
     #resp=[]
     #resd=[]
@@ -243,6 +247,9 @@ if __name__ == "__main__":
     image = cv2.cvtColor(image, cv2.COLOR_RGB2RGBA)
     print(prePanorama.shape[:2])
     print(image.shape[:2])
-    generatePanoramaCandidate(prePanorama,ds,image,ps)
+    finalpanorama,finalCenterPoint,TransformMatrix = generatePanoramaCandidate(image,ps,prePanorama,ds,[])
+    cv2.namedWindow("finalpanorama", cv2.WINDOW_NORMAL)    
+    cv2.imshow("finalpanorama",finalpanorama)
+    cv2.waitKey(0)
     
 
