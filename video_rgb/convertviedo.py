@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
-
+#input the video path
+#output an array [number of frame]*[h]*[w]*[4] BGRA and the fps of the video
 def convert_video_2_bgra(video_path):
 
     cap = cv2.VideoCapture(video_path)
@@ -23,6 +24,8 @@ def convert_video_2_bgra(video_path):
 
     return (arr,fps)
 
+#input an array [number of frame]*[h]*[w]*[4] BGRA and the fps of the video
+#output a video at the local
 def convert_bgra_2_video(arr, fps):
 
     height, width = len(arr[0]), len(arr[0][0])
@@ -30,6 +33,10 @@ def convert_bgra_2_video(arr, fps):
     for i in range(len(arr)):
         out.write(cv2.cvtColor(arr[i], cv2.COLOR_BGRA2BGR))
     out.release()
+
+#input any object foreground frame -- foreground_frame_arr [number of frame][h][w][4]
+#input the number of elements of the same object show in trail and background_panorama [h][w][4]
+#output the object display trail "app_one.png"
 
 def app_one_display_trails(foreground_frame_arr, foreground_element_num, background_panorama):
 
@@ -47,7 +54,10 @@ def app_one_display_trails(foreground_frame_arr, foreground_element_num, backgro
                     display_trails_pic[h_index][w_index][2] = foreground_frame_arr[i*interval_between_frames][h_index][w_index][2]
     save_pic_status = cv2.imwrite('app_one.png', display_trails_pic)
     print("App one Image written save file: ", save_pic_status)
-#location_path is a n*3 array which [y, x, time] foreground_frame_arr have all foreground
+#input ALL objects foreground frame -- foreground_frame_arr [number of frame][h][w][4]
+#input location_path is a n*3 array which [n][y, x, time] foreground_frame_arr have all foreground
+#input the output video info fps, video height, video width
+#output a video that follow the path
 def app_two_create_video(foreground_frame_arr, background_panorama, fps, video_height, video_width, location_path):
     frame_arr = []
     start_frame_location = location_path[0]
@@ -76,13 +86,34 @@ def app_two_create_video(foreground_frame_arr, background_panorama, fps, video_h
         start_frame_location = next_frame_location
     convert_bgra_2_video(frame_arr, fps)
 
+#combine object foreground frame
+#input foreground_frame_object_arr [num of object][number of frame][h][w][4]
+#input selected objects array if ith object selected, i-1th index is 1 otherwise 0 [1,1,1...0,1,0]
+#output foreground_frame_arr [number of frame][h][w][4]
+def combine_object_foreground_frame(foreground_frame_object_arr, selected_objects_arr):
+    foreground_frame_object_arr_num_frame = len(foreground_frame_object_arr[0])
+    foreground_frame_object_arr_height = len(foreground_frame_object_arr[0][0])
+    foreground_frame_object_arr_width = len(foreground_frame_object_arr[0][0][0])
+    foreground_frame_arr = [[[0,0,0,0] * foreground_frame_object_arr_width] * foreground_frame_object_arr_height] * foreground_frame_object_arr_num_frame
+    for se_index in range(len(selected_objects_arr)):
+        if selected_objects_arr[se_index] == 1:
+            for frame_index in range(foreground_frame_object_arr_num_frame):
+                for h_index in range(foreground_frame_object_arr_height):
+                    for w_index in range(foreground_frame_object_arr_width):
+                        if foreground_frame_object_arr[se_index][frame_index][h_index][w_index][3] == 255:
+                            foreground_frame_arr[frame_index][h_index][w_index][0] = foreground_frame_object_arr[se_index][frame_index][h_index][w_index][0]
+                            foreground_frame_arr[frame_index][h_index][w_index][1] = foreground_frame_object_arr[se_index][frame_index][h_index][w_index][1]
+                            foreground_frame_arr[frame_index][h_index][w_index][2] = foreground_frame_object_arr[se_index][frame_index][h_index][w_index][2]
+                            foreground_frame_arr[frame_index][h_index][w_index][3] = 255
+    return foreground_frame_arr
+
 def app_three_remove_object():
        print("..")
 
 
 if __name__ == "__main__":
-    video_path = "/Users/zihao/Documents/GitHub/remake-video-project/video_view/video2.mp4"
+    #video_path = "/Users/zihao/Documents/GitHub/remake-video-project/video_view/video2.mp4"
     #video_path = "C:\\Users\\14048\\Desktop\\multimedia\\project\\video_view/video2.mp4"
-    arr,fps = convert_video_2_bgra(video_path)
-    print(fps)
+    #arr,fps = convert_video_2_bgra(video_path)
+    print("")
     #convert_bgra_2_video(arr, fps)
