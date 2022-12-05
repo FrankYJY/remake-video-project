@@ -116,6 +116,7 @@ def cluster(points,eps=1,n_clusters=2):
     return res
 
 def get_cluster_labels_descending(cluster_labels):
+    # return [[label, count],...] in count descending order
     cluster_labels_counts = Counter(cluster_labels)
     cluster_labels_counts_list = []
     for key in cluster_labels_counts:

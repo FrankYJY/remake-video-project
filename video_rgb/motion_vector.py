@@ -30,8 +30,8 @@ def preprocess_a_frame_to_Y(frame_path_or_ndarray, block_size, resizeT_cutoutF =
 
     if isinstance(frame_path_or_ndarray, str):
         # should be rgb to yuv, but y is same
-        # frame_Y = BGR2YCrCb(cv2.imread(frame_path_or_ndarray))[:, :, np.newaxis] # get luminosity
-        pass
+        frame_Y = BGR2YCrCb(cv2.imread(frame_path_or_ndarray))[:, :, 1] # get luminosity
+
 
     elif isinstance(frame_path_or_ndarray, np.ndarray):
         frame_Y = BGR2YCrCb(frame_path_or_ndarray)[:, :, 1] # get luminosity
@@ -48,6 +48,30 @@ def preprocess_a_frame_to_Y(frame_path_or_ndarray, block_size, resizeT_cutoutF =
     
     frame_Y_blockized = frame_Y_blockized[:,:,np.newaxis]# [h, w, 1]
     return frame_Y_blockized
+
+
+def preprocess_a_frame_to_HSV(frame_path_or_ndarray, block_size, resizeT_cutoutF = False):
+    # get luminosity and blockize
+
+    if isinstance(frame_path_or_ndarray, str):
+        # should be rgb to yuv, but y is same
+        frame_Y = cv2.cvtColor(cv2.imread(frame_path_or_ndarray), cv2.COLOR_BGR2HSV)
+
+
+    elif isinstance(frame_path_or_ndarray, np.ndarray):
+        frame_Y = cv2.cvtColor(frame_path_or_ndarray, cv2.COLOR_BGR2HSV)
+
+    else:
+        raise ValueError
+    #resize frame to fit segmentation
+    blockized_h, blockized_w = get_blockized_height_width(frame_Y, block_size)
+    if resizeT_cutoutF:
+        frame_Y_blockized = cv2.resize(frame_Y, (blockized_w, blockized_h))
+    else:
+        frame_Y_blockized = np.array([[frame_Y[h][w] for w in range(blockized_w)]for h in range(blockized_h)])
+    
+    return frame_Y_blockized
+
 
 def preprocess_a_frame_size(frame_path_or_ndarray, block_size, resizeT_cutoutF = False):
     # get luminosity and blockize
@@ -499,17 +523,17 @@ def motion_vector_candidates_set_min_length_to_candidate_idx_0_inplace(motion_ve
 
 def make_cluster_dataset_of_motion_vectors(motion_vector_matrix):
     cluster_data = []
-    motion_vector_xy_to_idx = dict()
+    motion_vector_at_xy_to_idx = dict()
     i = 0
     for vector_y in range(len(motion_vector_matrix)):
         for vector_x in range(len(motion_vector_matrix[0])):
             motion_vector_matrix_candidate = motion_vector_matrix[vector_y][vector_x][0] # first candidate
             # cluster_data.append([motion_vector_matrix_candidate[0], motion_vector_matrix_candidate[1]])
             cluster_data.append(motion_vector_matrix_candidate)
-            motion_vector_xy_to_idx[(vector_y, vector_x)] = i
+            motion_vector_at_xy_to_idx[(vector_y, vector_x)] = i
             i += 1
     
-    return cluster_data, motion_vector_xy_to_idx
+    return cluster_data, motion_vector_at_xy_to_idx
 
 if __name__ == "__main__":
     if_calculate_prediction_and_output = True
@@ -555,7 +579,7 @@ if __name__ == "__main__":
     motion_vector_matrix_h = len(motion_vector_matrix)
     motion_vector_matrix_w = len(motion_vector_matrix[0])
     motion_vector_matrix = np.array([motion_vector_matrix[x][1:motion_vector_matrix_w-1] for x in range(1,motion_vector_matrix_h-1)])
-    cluster_data, motion_vector_xy_to_idx = make_cluster_dataset_of_motion_vectors(motion_vector_matrix)
+    cluster_data, motion_vector_at_xy_to_idx = make_cluster_dataset_of_motion_vectors(motion_vector_matrix)
     # print(cluster_data)
 
     dydx_tuples = []
@@ -584,7 +608,7 @@ if __name__ == "__main__":
             for h in range(frame_n1_RGBA.shape[0]):
                 h_idx = h // block_size
                 w_idx = w // block_size
-                cur_pixel_belongs_to_block_idx = motion_vector_xy_to_idx[(h_idx, w_idx)]
+                cur_pixel_belongs_to_block_idx = motion_vector_at_xy_to_idx[(h_idx, w_idx)]
                 if cluster_labels[cur_pixel_belongs_to_block_idx] == label:
                     frame_n1_RGBA[h][w][3] = 255
                 else:

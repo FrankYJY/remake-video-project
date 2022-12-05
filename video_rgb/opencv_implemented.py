@@ -6,7 +6,7 @@ import numpy as np
 def lucas_kanade_method(video_path):
     cap = cv2.VideoCapture(video_path)
     # params for ShiTomasi corner detection
-    feature_params = dict(maxCorners=100, qualityLevel=0.3, minDistance=7, blockSize=7)
+    feature_params = dict(maxCorners=100, qualityLevel=0.3, minDistance=7, blockSize=16)
     # Parameters for lucas kanade optical flow
     lk_params = dict(
         winSize=(15, 15),
@@ -37,8 +37,8 @@ def lucas_kanade_method(video_path):
         for i, (new, old) in enumerate(zip(good_new, good_old)):
             a, b = new.ravel()
             c, d = old.ravel()
-            mask = cv2.line(mask, (a, b), (c, d), color[i].tolist(), 2)
-            frame = cv2.circle(frame, (a, b), 5, color[i].tolist(), -1)
+            mask = cv2.line(mask, (int(a), int(b)), (int(c), int(d)), color[i].tolist(), 2)
+            frame = cv2.circle(frame, (int(a), int(b)), 5, color[i].tolist(), -1)
         img = cv2.add(frame, mask)
         cv2.imshow("frame", img)
         k = cv2.waitKey(25) & 0xFF
@@ -118,9 +118,11 @@ def main():
     #     method = cv2.optflow.calcOpticalFlowDenseRLOF
     #     dense_optical_flow(method, video_path)
 
-    video_path = "C:/Users/14048/Desktop/multimedia/project/video_view/video1.mp4"
-    method = cv2.optflow.calcOpticalFlowSparseToDense
-    dense_optical_flow(method, video_path, to_gray=True)
+    video_path = "C:/Users/14048/Desktop/multimedia/project/video_view/Stairs_compact.mp4"
+
+    lucas_kanade_method(video_path)
+    # method = cv2.optflow.calcOpticalFlowSparseToDense
+    # dense_optical_flow(method, video_path, to_gray=False)
 
 
 if __name__ == "__main__":

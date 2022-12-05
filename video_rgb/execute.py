@@ -44,17 +44,18 @@ if __name__ == "__main__":
         ##############
         # video
         video_path = "../video_view/SAL.mp4"
-        video_path = "D:\\chrome downloads\\final_demo_data\\final_demo_data/test1.mp4"
+        # video_path = "D:\\chrome downloads\\final_demo_data\\final_demo_data/test2.mp4"
         frames, fps = convert_video_2_bgra(video_path)
         frame_num = len(frames)
 
     if_calculate_prediction_and_output = True
 
-    block_size = 32
+    block_size = 16
     search_expand_length = 16
-    frame_predict_step = 5
+    frame_predict_step = 20
     search_method = "h"  # h for hierarchical b for brute force
 
+    motion_difference_threshold = [3, 3, 1000]
 
 
     for frame_idx_0 in range(frame_num-frame_predict_step):
@@ -69,8 +70,13 @@ if __name__ == "__main__":
             frame_n0 = frames[frame_idx_0]
             frame_n1 = frames[frame_idx_1]
 
-        frame_n0 = cv2.resize(frame_n0, (len(frame_n0[0])//2, len(frame_n0)//2), interpolation=cv2.INTER_LINEAR)
-        frame_n1 = cv2.resize(frame_n1, (len(frame_n1[0])//2, len(frame_n1)//2), interpolation=cv2.INTER_LINEAR)
+        # ratio = len(frame_n0)/len(frame_n0[0]) # h/ w
+        # set_h = 512
+        # frame_n0 = cv2.resize(frame_n0, (int(set_h/ratio), set_h), interpolation=cv2.INTER_LINEAR)
+        # frame_n1 = cv2.resize(frame_n1, (int(set_h/ratio), set_h), interpolation=cv2.INTER_LINEAR)
+        # if frame_n0[0] > 600:
+        #     frame_n0 = cv2.resize(frame_n0, (len(frame_n0[0])//2, len(frame_n0)//2), interpolation=cv2.INTER_LINEAR)
+        #     frame_n1 = cv2.resize(frame_n1, (len(frame_n1[0])//2, len(frame_n1)//2), interpolation=cv2.INTER_LINEAR)
         # frame_n0 = cv2.resize(frame_n0, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
         # frame_n1 = cv2.resize(frame_n1, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
         # preprocess_a_frame_size_inplace(frame_n0, block_size)
@@ -81,37 +87,50 @@ if __name__ == "__main__":
         frame_n1_Y_blockized = frame_n1
         # frame_n0_Y_blockized = preprocess_a_frame_to_Y(frame_n0, block_size)
         # frame_n1_Y_blockized = preprocess_a_frame_to_Y(frame_n1, block_size)
+        frame_n0_Y_blockized = preprocess_a_frame_to_HSV(frame_n0, block_size)
+        frame_n1_Y_blockized = preprocess_a_frame_to_HSV(frame_n1, block_size)
         motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, search_method, search_expand_length, if_calculate_prediction_and_output)
         if if_calculate_prediction_and_output:
             draw_line_on_predicted(predicted, motion_vector_matrix, block_size)
             save_intermediate_images(frame_n1_Y_blockized, predicted, idx = frame_idx_0)
         motion_vector_candidates_set_min_length_to_candidate_idx_0_inplace(motion_vector_matrix)
 
-        # cutting out edges
+        # cutting out four edges
         motion_vector_matrix_h = len(motion_vector_matrix)
         motion_vector_matrix_w = len(motion_vector_matrix[0])
         motion_vector_matrix = np.array([motion_vector_matrix[x][1:motion_vector_matrix_w-1] for x in range(1,motion_vector_matrix_h-1)])
-        cluster_data, motion_vector_xy_to_idx = make_cluster_dataset_of_motion_vectors(motion_vector_matrix)
-        # print(cluster_data)
+        #                here is at [x,y] map to 1d clustered labels
+        cluster_data, motion_vector_at_xy_to_idx = make_cluster_dataset_of_motion_vectors(motion_vector_matrix)
+        #motion_vector_matrix = motion_vector_matrix[1:motion_vector_matrix_h-1,1:motion_vector_matrix_w-1,:,:]
+        frame_n1_h = len(frame_n1)
+        frame_n1_w = len(frame_n1[0])
+        frame_n1 = np.array([frame_n1[x][block_size:frame_n1_w-block_size] for x in range(block_size,frame_n1_h-block_size)])
+        
 
+        # just for print
         dydx_tuples = []
         for h in range(len(motion_vector_matrix)):
             for w in range(len(motion_vector_matrix[0])):
                 dydx_tuples.append(tuple(motion_vector_matrix[h][w][0]))
         print(Counter(dydx_tuples))
+        # print(cluster_data)
 
-
-        #motion_vector_matrix = motion_vector_matrix[1:motion_vector_matrix_h-1,1:motion_vector_matrix_w-1,:,:]
-        frame_n1_h = len(frame_n1)
-        frame_n1_w = len(frame_n1[0])
-        frame_n1 = np.array([frame_n1[x][block_size:frame_n1_w-block_size] for x in range(block_size,frame_n1_h-block_size)])
         #frame_n1=frame_n1[block_size:frame_n1_h-block_size,block_size:frame_n1_w-block_size]
         cluster_labels = cluster(cluster_data)
 
-        
-
         labels_descending = get_cluster_labels_descending(cluster_labels)
+        clustered_labels_to_ascending_labels_by_count = dict()
+        for idx in range(len(labels_descending)):
+            clustered_labels_to_ascending_labels_by_count[labels_descending[idx][0]] = idx
         print(len(labels_descending), "clusters")
+
+        # mark block belongs to which class, class ascending from 0
+        blocks_class_mask = [[0 for i in range(len(motion_vector_matrix[0]))] for j in range(len(motion_vector_matrix))]
+        for h in range(len(motion_vector_matrix)):
+            for w in range(len(motion_vector_matrix[0])):
+                blocks_class_mask[h][w] = clustered_labels_to_ascending_labels_by_count[cluster_labels[motion_vector_at_xy_to_idx[(h, w)]]]
+
+
         frame_n1_RGBA_base = cv2.cvtColor(frame_n1, cv2.COLOR_RGB2RGBA)
         extracted_frame_n1_RGBA_s = []
         for label, label_count in labels_descending:
@@ -120,7 +139,7 @@ if __name__ == "__main__":
                 for h in range(frame_n1_RGBA.shape[0]):
                     h_idx = h // block_size
                     w_idx = w // block_size
-                    cur_pixel_belongs_to_block_idx = motion_vector_xy_to_idx[(h_idx, w_idx)]
+                    cur_pixel_belongs_to_block_idx = motion_vector_at_xy_to_idx[(h_idx, w_idx)]
                     if cluster_labels[cur_pixel_belongs_to_block_idx] == label:
                         frame_n1_RGBA[h][w][3] = 255
                     else:
