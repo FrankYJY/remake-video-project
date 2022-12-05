@@ -2,6 +2,7 @@ from motion_vector import *
 from getPNGPath import *
 from cluster import *
 from convertviedo import *
+from panorama import *
 
 if __name__ == "__main__":
     # test.py arg1 arg2
@@ -44,15 +45,15 @@ if __name__ == "__main__":
         ##############
         # video
         video_path = "../video_view/SAL.mp4"
-        video_path = "D:\\chrome downloads\\final_demo_data\\final_demo_data/test1.mp4"
+        video_path = "/Users/piaomz/Desktop/CSCI576/final_demo_data/test1.mp4"
         frames, fps = convert_video_2_bgra(video_path)
         frame_num = len(frames)
 
     if_calculate_prediction_and_output = True
 
     block_size = 32
-    search_expand_length = 16
-    frame_predict_step = 5
+    search_expand_length = 32
+    frame_predict_step = 4
     search_method = "h"  # h for hierarchical b for brute force
 
 
@@ -102,8 +103,11 @@ if __name__ == "__main__":
 
 
         #motion_vector_matrix = motion_vector_matrix[1:motion_vector_matrix_h-1,1:motion_vector_matrix_w-1,:,:]
+        frame_n0_h = len(frame_n0)
+        frame_n0_w = len(frame_n0[0])
         frame_n1_h = len(frame_n1)
         frame_n1_w = len(frame_n1[0])
+        frame_n0=np.array([frame_n0[x][block_size:frame_n0_w-block_size] for x in range(block_size,frame_n0_h-block_size)])
         frame_n1 = np.array([frame_n1[x][block_size:frame_n1_w-block_size] for x in range(block_size,frame_n1_h-block_size)])
         #frame_n1=frame_n1[block_size:frame_n1_h-block_size,block_size:frame_n1_w-block_size]
         cluster_labels = cluster(cluster_data)
@@ -124,7 +128,26 @@ if __name__ == "__main__":
                     if cluster_labels[cur_pixel_belongs_to_block_idx] == label:
                         frame_n1_RGBA[h][w][3] = 255
                     else:
-                        frame_n1_RGBA[h][w] = [0, 255, 0, 255]
+                        frame_n1_RGBA[h][w] = [0, 0, 0, 0]
             extracted_frame_n1_RGBA_s.append(frame_n1_RGBA)
             cv2.imshow("frame_n1_RGBA" + str(label), frame_n1_RGBA)
-            cv2.waitKey(0)
+            #cv2.waitKey(0)
+        
+        ps=[]
+        ds=[]
+        for borderSize in range(0,10):
+            try:
+                p, d = getFourPoints(motion_vector_matrix,extracted_frame_n1_RGBA_s,block_size,borderSize)
+                print(p,d)
+                #d = [[item[0]+block_size,item[1]+block_size] for item in d]
+                ps.append(p)
+                ds.append(d)
+            except:
+                pass      
+        #print(extracted_frame_n1_RGBA_s[0].shape[:2])
+        #print(frame_n0.shape[:2])
+        panorama,centerPoint = generatePanoramaCandidate(extracted_frame_n1_RGBA_s[0],ps,frame_n0,ds)
+        print(centerPoint)
+        print(1)
+        pass
+                
