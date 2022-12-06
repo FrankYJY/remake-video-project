@@ -14,7 +14,8 @@ def convert_video_2_bgra(video_path):
         ret, frame = cap.read()
         if not ret:
             break
-        bgra = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+        # bgra = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+        bgra = frame
         arr.append(bgra)
         #arr.append(frame)
         if(cv2.waitKey(1)==ord('q')):
