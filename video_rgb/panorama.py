@@ -113,6 +113,10 @@ def drawPanorama(imageNext,p,image,d):
     difference = 0 
     countdiff=0
     #print(1)
+    minh=height
+    maxh=0
+    minw=width
+    maxw=0
     for w in range(width):
         for h in range(height):
             if(correctedImage[h][w][3]!=0):
@@ -124,7 +128,17 @@ def drawPanorama(imageNext,p,image,d):
                     copied[h][w]=copied[h][w]
                 else:
                     copied[h][w]=correctedImage[h][w]
-                    
+            if(copied[h][w][3]!=0):
+                if(h<minh):
+                    minh=h
+                if(h>maxh):
+                    maxh=h
+                if(w<minw):
+                    minw=w
+                if(w>maxw):
+                    maxw=w
+    copied = np.array([copied[x][minw:maxw] for x in range(minh,maxh)])            
+    centerPoint= [int(abs(min(xborder)))-minh,int(abs(min(yborder)))-minw]                
     difference/=countdiff
     #print(difference)            
     #print(2)
@@ -240,6 +254,8 @@ if __name__ == "__main__":
 
     ps=[[[1053,570],[463,570],[810,180],[35,180]],[[1055,570],[463,572],[810,181],[35,182]]]
     ds=[[[1628,570],[1038,570],[1385,180],[610,180]],[[1628,572],[1038,571],[1387,180],[615,180]]]
+    ps=[[[1053,570],[463,570],[810,180],[35,180]]]
+    ds=[[[1628,570],[1038,570],[1385,180],[610,180]]]
     path=""
     prePanorama = cv2.imread(path+"prePonorama.png")
     prePanorama = cv2.cvtColor(prePanorama, cv2.COLOR_RGB2RGBA)
