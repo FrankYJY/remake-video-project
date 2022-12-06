@@ -72,7 +72,7 @@ def cluster(points,eps=1,n_clusters=2):
     plt.scatter([item[0] for item in features],[item[1] for item in features], c=dbscan.labels_,cmap="coolwarm")
     
     plt.scatter([xmean],[ymean], s=50,c='b')
-    plt.show()
+    # plt.show()
     '''
     # Plot the data and cluster silhouette comparison
     fig, (ax1, ax2) = plt.subplots(

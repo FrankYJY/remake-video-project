@@ -44,7 +44,7 @@ if __name__ == "__main__":
     elif input_type == "vid":
         ##############
         # video
-        video_path = "../video_view/Finaltest2_compact.mp4"
+        video_path = "../video_view/Finaltest1_compact.mp4"
         # video_path = "D:\\chrome downloads\\final_demo_data\\final_demo_data/test2.mp4"
         # video_path = "/Users/piaomz/Desktop/CSCI576/final_demo_data/test1.mp4"
         frames, fps = convert_video_2_bgra(video_path)
@@ -67,7 +67,8 @@ if __name__ == "__main__":
 
     wholePanorama=np.array([])
     centerPoint=[0,0]
-    for frame_idx_0 in range(0,frame_num-frame_predict_step,frame_predict_step):
+    for frame_idx_0 in range(frame_num-frame_predict_step):
+    # for frame_idx_0 in range(0, frame_num-frame_predict_step, frame_predict_step):
         print("calculating motion vector" + str(frame_idx_0))
         frame_idx_1 = frame_idx_0 + frame_predict_step
         if input_type == "img":
@@ -121,7 +122,7 @@ if __name__ == "__main__":
         for h in range(len(motion_vector_matrix)):
             for w in range(len(motion_vector_matrix[0])):
                 dydx_tuples.append(tuple(motion_vector_matrix[h][w][0]))
-        print(Counter(dydx_tuples))
+        # print(Counter(dydx_tuples))
         # print(cluster_data)
 
         ##############
@@ -193,40 +194,51 @@ if __name__ == "__main__":
                             # q.append((nei_i, nei_j))
                             blocks_class_mask[nei_i][nei_j] = 0
 
+
+
         # check all not searched if so steep from others
         # vote from neighbours
+        #                     bkg    obj
+        #            successive vote
+        mask_label_sets = [set([0,3]), set([1,4])]
         for cur_i in range(motion_vector_matrix_h):
             for cur_j in range(motion_vector_matrix_w):
                 if blocks_class_mask[cur_i][cur_j] == 2:# not searched
                     neighbour_num = 0
-                    vote_value = 0
+                    nei_is_obj_vote = 0
                     for direction in motion_difference_threshold_search_directions:
                         nei_i = cur_i + direction[0]
                         nei_j = cur_j + direction[1]
                         if 0 <= nei_i < motion_vector_matrix_h and 0 <= nei_j < motion_vector_matrix_w:
                             neighbour_num += 1 # nei exist
-                            vote_value += blocks_class_mask[nei_i][nei_j]
-                    if vote_value >= neighbour_num/2:
-                        blocks_class_mask[cur_i][cur_j] = 1
+                            if blocks_class_mask[nei_i][nei_j] in mask_label_sets[0]:
+                                nei_is_obj_vote += 1
+                    if nei_is_obj_vote >= neighbour_num/2:
+                        blocks_class_mask[cur_i][cur_j] = 4
                     else:
-                        blocks_class_mask[cur_i][cur_j] = 0
+                        blocks_class_mask[cur_i][cur_j] = 3
+
+
         
         frame_n1_RGBA_base = cv2.cvtColor(frame_n1, cv2.COLOR_RGB2RGBA)
         extracted_frame_n1_RGBA_s = []
-        for mask_label in [0,1,2]:
+        # for mask_label_set in [set([0]),set([1]),set([3]),set([4])]:
+        for mask_label_set in mask_label_sets:
             frame_n1_RGBA = frame_n1_RGBA_base.copy()
             for w in range(frame_n1_RGBA.shape[1]):
                 for h in range(frame_n1_RGBA.shape[0]):
                     h_idx = h // block_size
                     w_idx = w // block_size
-                    if blocks_class_mask[h_idx][w_idx] == mask_label:
+                    if blocks_class_mask[h_idx][w_idx] in mask_label_set:
                         frame_n1_RGBA[h][w][3] = 255
                     else:
                         frame_n1_RGBA[h][w] = [0, 0, 0, 0]
             extracted_frame_n1_RGBA_s.append(frame_n1_RGBA)
-            cv2.imshow("frame_n1_RGBA" + str(mask_label), frame_n1_RGBA)
-        cv2.waitKey(0)
+        #     cv2.imshow("frame_n1_RGBA" + str(mask_label), frame_n1_RGBA)
+        # cv2.waitKey(0)
+        cv2.imwrite(f"OUTPUT/predictedFrameForeground"+"{:03d}".format(frame_idx_0)+".png", extracted_frame_n1_RGBA_s[1])
 
+        continue
         ##############
         # clustering
 
