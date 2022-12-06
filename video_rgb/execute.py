@@ -3,6 +3,7 @@ from getPNGPath import *
 from cluster import *
 from convertviedo import *
 from panorama import *
+import pickle
 
 if __name__ == "__main__":
     # test.py arg1 arg2
@@ -47,6 +48,11 @@ if __name__ == "__main__":
         video_path = "../video_view/Finaltest1_compact.mp4"
         # video_path = "D:\\chrome downloads\\final_demo_data\\final_demo_data/test2.mp4"
         # video_path = "/Users/piaomz/Desktop/CSCI576/final_demo_data/test1.mp4"
+        splitted1 = video_path.split("/")
+        splitted2 = []
+        for splitted1_seg in splitted1:
+            splitted2 += splitted1_seg.split("\\")
+        main_folder = splitted2[-1].split(".")[0]
         frames, fps = convert_video_2_bgra(video_path)
         frame_num = len(frames)
 
@@ -59,17 +65,22 @@ if __name__ == "__main__":
     # block_size = 32
     # search_expand_length = 32
     # frame_predict_step = 4
+    resizeT_cutoutF = True
     search_method = "h"  # h for hierarchical b for brute force
 
-    motion_difference_tolerate_thresholds = [5, 5, 2000]
+    motion_difference_tolerate_thresholds = [2, 2, 1000]
     over_this_threshold_count_set_as_search_start_bkg_threshold = 10
     motion_difference_threshold_search_directions = [(1,0),(0,1),(-1,0),(0,-1)]
+
+    folder_prefix = main_folder + "_" + str(block_size) + "_" + str(search_expand_length) + "_" + str(frame_predict_step) + "_" + str(max_best_candidates_per_level) + "_" + str(resizeT_cutoutF) + "_" + search_method + "_" + str(motion_difference_tolerate_thresholds) + "_" + str(over_this_threshold_count_set_as_search_start_bkg_threshold) + "_" + str(motion_difference_threshold_search_directions)
+    motion_vector_storage = "./motion_vector_storage/" + folder_prefix
+    if not os.path.exists(motion_vector_storage):
+        os.makedirs(motion_vector_storage)
 
     wholePanorama=np.array([])
     centerPoint=[0,0]
     for frame_idx_0 in range(frame_num-frame_predict_step):
     # for frame_idx_0 in range(0, frame_num-frame_predict_step, frame_predict_step):
-        print("calculating motion vector" + str(frame_idx_0))
         frame_idx_1 = frame_idx_0 + frame_predict_step
         if input_type == "img":
             frame_idx_0_path = png_path_prefix + "."+  "{:03d}".format(frame_idx_0 + 1) + ".png"
@@ -91,19 +102,33 @@ if __name__ == "__main__":
         # frame_n1 = cv2.resize(frame_n1, (block_size*64, block_size*36), interpolation=cv2.INTER_LINEAR)
         # preprocess_a_frame_size_inplace(frame_n0, block_size)
 
-        frame_n0 = preprocess_a_frame_size(frame_n0, block_size, resizeT_cutoutF=True) # here is blockized
-        frame_n1 = preprocess_a_frame_size(frame_n1, block_size, resizeT_cutoutF=True) # here is blockized
+        frame_n0 = preprocess_a_frame_size(frame_n0, block_size, resizeT_cutoutF=resizeT_cutoutF) # here is blockized
+        frame_n1 = preprocess_a_frame_size(frame_n1, block_size, resizeT_cutoutF=resizeT_cutoutF) # here is blockized
         frame_n0_Y_blockized = frame_n0
         frame_n1_Y_blockized = frame_n1
         # frame_n0_Y_blockized = preprocess_a_frame_to_Y(frame_n0, block_size)
         # frame_n1_Y_blockized = preprocess_a_frame_to_Y(frame_n1, block_size)
         frame_n0_Y_blockized = preprocess_a_frame_to_HSV(frame_n0, block_size)
         frame_n1_Y_blockized = preprocess_a_frame_to_HSV(frame_n1, block_size)
-        motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, search_method, search_expand_length, max_best_candidates_per_level, if_calculate_prediction_and_output)
-        if if_calculate_prediction_and_output:
-            draw_line_on_predicted(predicted, motion_vector_matrix, block_size)
-            save_intermediate_images(frame_n1_Y_blockized, predicted, idx = frame_idx_0)
-        motion_vector_candidates_set_min_length_to_candidate_idx_0_inplace(motion_vector_matrix)
+        cur_vector_file_name = "motion_vector"+"{:03d}".format(frame_idx_0)
+        cur_vector_file_path = motion_vector_storage + "/" + cur_vector_file_name
+        if os.path.exists(cur_vector_file_path):
+            print("loading motion vector" + str(frame_idx_0))
+            # load data
+            storage_file = open(cur_vector_file_path, 'rb')
+            motion_vector_matrix = pickle.load(storage_file)
+            storage_file.close()
+        else:
+            print("calculating motion vector" + str(frame_idx_0))
+            motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, search_method, search_expand_length, max_best_candidates_per_level, if_calculate_prediction_and_output)
+            if if_calculate_prediction_and_output:
+                draw_line_on_predicted(predicted, motion_vector_matrix, block_size)
+                save_intermediate_images(frame_n1_Y_blockized, predicted, idx = frame_idx_0)
+            motion_vector_candidates_set_min_length_to_candidate_idx_0_inplace(motion_vector_matrix)
+            # store
+            storage_file = open(cur_vector_file_path, 'wb')
+            pickle.dump(motion_vector_matrix, storage_file)
+            storage_file.close()
 
         # cutting out four edges
         motion_vector_matrix_h = len(motion_vector_matrix)
@@ -142,7 +167,7 @@ if __name__ == "__main__":
                 dydx_tuples.append((motion_vector_matrix[h][w][0][0],motion_vector_matrix[h][w][0][1]))
         dydx_tuples_counts = Counter(dydx_tuples) # (dy,dx): count
         descending_dydx_tuples = sorted(dydx_tuples_counts, key=dydx_tuples_counts.get, reverse=True)
-        print(descending_dydx_tuples)
+        # print(descending_dydx_tuples)
 
         for h in range(motion_vector_matrix_h):  
             for w in range(motion_vector_matrix_w):
@@ -213,7 +238,7 @@ if __name__ == "__main__":
                             neighbour_num += 1 # nei exist
                             if blocks_class_mask[nei_i][nei_j] in mask_label_sets[0]:
                                 nei_is_obj_vote += 1
-                    if nei_is_obj_vote >= neighbour_num/2:
+                    if nei_is_obj_vote > neighbour_num/2:
                         blocks_class_mask[cur_i][cur_j] = 4
                     else:
                         blocks_class_mask[cur_i][cur_j] = 3
@@ -222,8 +247,8 @@ if __name__ == "__main__":
         
         frame_n1_RGBA_base = cv2.cvtColor(frame_n1, cv2.COLOR_RGB2RGBA)
         extracted_frame_n1_RGBA_s = []
-        # for mask_label_set in [set([0]),set([1]),set([3]),set([4])]:
-        for mask_label_set in mask_label_sets:
+        for mask_label_set in [set([0]),set([1,3,4])]:
+        # for mask_label_set in mask_label_sets:
             frame_n1_RGBA = frame_n1_RGBA_base.copy()
             for w in range(frame_n1_RGBA.shape[1]):
                 for h in range(frame_n1_RGBA.shape[0]):
@@ -232,11 +257,15 @@ if __name__ == "__main__":
                     if blocks_class_mask[h_idx][w_idx] in mask_label_set:
                         frame_n1_RGBA[h][w][3] = 255
                     else:
-                        frame_n1_RGBA[h][w] = [0, 0, 0, 0]
+                        frame_n1_RGBA[h][w][3] = 0
             extracted_frame_n1_RGBA_s.append(frame_n1_RGBA)
-        #     cv2.imshow("frame_n1_RGBA" + str(mask_label), frame_n1_RGBA)
+            # cv2.imshow("frame_n1_RGBA" + str(mask_label_set), frame_n1_RGBA)
         # cv2.waitKey(0)
-        cv2.imwrite(f"OUTPUT/predictedFrameForeground"+"{:03d}".format(frame_idx_0)+".png", extracted_frame_n1_RGBA_s[1])
+        if not os.path.exists("./labeled_imgs/"+ main_folder):
+            os.mkdir("./labeled_imgs")
+            os.mkdir("./labeled_imgs/"+ main_folder)
+        cv2.imwrite("./labeled_imgs/"+ main_folder + "/background_0_"+"{:03d}".format(frame_idx_0)+".png", extracted_frame_n1_RGBA_s[0])
+        cv2.imwrite("./labeled_imgs/"+ main_folder + "/foreground_134_"+"{:03d}".format(frame_idx_0)+".png", extracted_frame_n1_RGBA_s[1])
 
         continue
         ##############

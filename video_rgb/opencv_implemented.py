@@ -6,15 +6,15 @@ import numpy as np
 def lucas_kanade_method(video_path):
     cap = cv2.VideoCapture(video_path)
     # params for ShiTomasi corner detection
-    feature_params = dict(maxCorners=100, qualityLevel=0.3, minDistance=7, blockSize=16)
+    feature_params = dict(maxCorners=100000, qualityLevel=0.01, minDistance=7, blockSize=16)
     # Parameters for lucas kanade optical flow
     lk_params = dict(
         winSize=(15, 15),
-        maxLevel=2,
-        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),
+        maxLevel=4,
+        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.03),
     )
     # Create some random colors
-    color = np.random.randint(0, 255, (100, 3))
+    color = np.random.randint(0, 255, (100000, 3))
     # Take first frame and find corners in it
     ret, old_frame = cap.read()
     old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
@@ -22,6 +22,7 @@ def lucas_kanade_method(video_path):
     # Create a mask image for drawing purposes
     mask = np.zeros_like(old_frame)
     while True:
+        p0 = cv2.goodFeaturesToTrack(old_gray, mask=None, **feature_params)
         ret, frame = cap.read()
         if not ret:
             break
@@ -40,7 +41,7 @@ def lucas_kanade_method(video_path):
         for i, (new, old) in enumerate(zip(good_new, good_old)):
             a, b = new.ravel()
             c, d = old.ravel()
-            mask = cv2.line(mask, (int(a), int(b)), (int(c), int(d)), color[i].tolist(), 2)
+            # mask = cv2.line(mask, (int(a), int(b)), (int(c), int(d)), color[i].tolist(), 2)
             frame = cv2.circle(frame, (int(a), int(b)), 5, color[i].tolist(), -1)
         img = cv2.add(frame, mask)
         cv2.imshow("frame", img)
@@ -77,7 +78,7 @@ def dense_optical_flow(method, video_path, params=[], to_gray=False):
         if to_gray:
             new_frame = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)
         # Calculate Optical Flow
-        flow = method(old_frame, new_frame, None, *params)
+        flow = cv2.optflow.calcOpticalFlowSparseToDense(old_frame, new_frame, None, *params)
 
         # Encoding: convert the algorithm's output into Polar coordinates
         mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
@@ -121,11 +122,11 @@ def main():
     #     method = cv2.optflow.calcOpticalFlowDenseRLOF
     #     dense_optical_flow(method, video_path)
 
-    video_path = "C:/Users/14048/Desktop/multimedia/project/video_view/Stairs_compact.mp4"
+    video_path = "../video_view/Finaltest1.mp4"
 
-    # lucas_kanade_method(video_path)
-    method = cv2.optflow.calcOpticalFlowSparseToDense
-    dense_optical_flow(method, video_path, to_gray=False)
+    lucas_kanade_method(video_path)
+    # method = cv2.optflow.calcOpticalFlowSparseToDense
+    # dense_optical_flow(method, video_path, to_gray=False)
 
 
 if __name__ == "__main__":
