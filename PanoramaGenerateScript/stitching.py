@@ -83,8 +83,10 @@ if __name__ == '__main__':
     if args.save:
         logging.info(f'saving final image to {args.save_path}')
         cv2.imwrite(args.save_path, result)
-    '''
-    #render foreground
+   
+    logging.info('finished stitching images together')
+    
+    #render foreground #mode 0 
     for idx, frame in enumerate(load_frames(args.paths)):
         stitcherR = ImageStitcher()
         result=cv2.imread(args.save_path,cv2.IMREAD_UNCHANGED)
@@ -96,7 +98,7 @@ if __name__ == '__main__':
         cv2.imwrite(image_name, result)
         del(stitcherR)
     
-    #all ground
+    #all ground,  mode 1
     for idx, frame in enumerate(load_frames(args.paths)):
         stitcherR = ImageStitcher()
         result=cv2.imread(args.save_path,cv2.IMREAD_UNCHANGED)
@@ -110,5 +112,16 @@ if __name__ == '__main__':
         image_name = f'allground/allground_{idx}.png'
         cv2.imwrite(image_name, result)
         del(stitcherR)
-    logging.info('finished stitching images together')
+     '''
     
+    #No object Video,  mode 2
+    for idx, frame in enumerate(load_frames(args.paths)):
+        stitcherR = ImageStitcher()
+        result=cv2.imread(args.save_path,cv2.IMREAD_UNCHANGED)
+        result = set_alpha_all_255(result)
+        stitcherR.add_image(result,mode=2)
+        stitcherR.add_image(frame,mode=2)
+        result = stitcherR.image()
+        image_name = f'noobjectvideo/noobjectvideo_{idx}.png'
+        cv2.imwrite(image_name, result)
+        del(stitcherR)
