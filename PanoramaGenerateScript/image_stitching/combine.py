@@ -61,31 +61,53 @@ def combine_images(img0, img1, h_matrix, mode=0):
     logging.debug('warping previous image...')
     output_img = cv2.warpPerspective(img1, h_translation.dot(h_matrix),
                                      (x_max - x_min, y_max - y_min))
-    i0=0
-    j0=0
+    
     #print(img0.shape)
     #print(-y_min,img0.shape[0] - y_min)
     #print(-x_min,img0.shape[1] - x_min)
-    for i in range(-y_min,img0.shape[0] - y_min):
+    if(mode==2):
+        i0=0
         j0=0
-        for j in range(-x_min,img0.shape[1] - x_min):
-            if(img0[i0][j0][3]==0 and output_img[i][j][3]==0):
-                pass
-            elif(img0[i0][j0][3]!=0 and output_img[i][j][3]==0):
-                output_img[i][j]=img0[i0][j0]
-            elif(img0[i0][j0][3]==0 and output_img[i][j][3]!=0):
-                pass
-            else:
-                if(mode==0):
-                    output_img[i][j]=img0[i0][j0]
-                else:
+        for i in range(-y_min,img0.shape[0] - y_min):
+            j0=0
+            for j in range(-x_min,img0.shape[1] - x_min):
+                #output_img is panorama, img0 is video frame
+                if(img0[i0][j0][3]==0 and output_img[i][j][3]==0):
+                    img0[i0][j0][3]==255
+                elif(img0[i0][j0][3]!=0 and output_img[i][j][3]==0):
+                    #output_img[i][j]=img0[i0][j0]
                     pass
-            pass
-            j0+=1
-        i0+=1
-        
+                elif(img0[i0][j0][3]==0 and output_img[i][j][3]!=0):
+                    img0[i0][j0]=output_img[i][j]
+                    pass
+                else:
+                    img0[i0][j0]=output_img[i][j]
+                j0+=1
+            i0+=1
+        return img0
+    else:
+        i0=0
+        j0=0
+        for i in range(-y_min,img0.shape[0] - y_min):
+            j0=0
+            for j in range(-x_min,img0.shape[1] - x_min):
+                if(img0[i0][j0][3]==0 and output_img[i][j][3]==0):
+                    pass
+                elif(img0[i0][j0][3]!=0 and output_img[i][j][3]==0):
+                    output_img[i][j]=img0[i0][j0]
+                elif(img0[i0][j0][3]==0 and output_img[i][j][3]!=0):
+                    pass
+                else:
+                    if(mode==0):
+                        output_img[i][j]=img0[i0][j0]
+                    else:
+                        pass
+                pass
+                j0+=1
+            i0+=1
+        return output_img
     #print(img0.shape)
     #print(-y_min,img0.shape[0] - y_min)
     #print(-x_min,img0.shape[1] - x_min)
     #output_img[-y_min:img0.shape[0] - y_min, -x_min:img0.shape[1] - x_min] = img0
-    return output_img
+    
