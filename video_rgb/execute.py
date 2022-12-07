@@ -7,7 +7,7 @@ import multiprocessing
 import pickle
 from functools import partial
 
-def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, labeled_generation_mode):
+def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, labeled_generation_mode, classify_method):
     print("start", frame_idx_0)
     jump_generated_hd_imgs = False
     if jump_generated_hd_imgs and os.path.exists("./labeled_imgs/"+ main_folder + "/hd_background_0_"+"{:03d}".format(frame_idx_0)+".png") and os.path.exists(    "./labeled_imgs/"+ main_folder + "/hd_foreground_134_"+"{:03d}".format(frame_idx_0)+".png"):
@@ -66,9 +66,8 @@ def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, fram
     motion_vector_matrix_h = len(motion_vector_matrix)
     motion_vector_matrix_w = len(motion_vector_matrix[0])
     motion_vector_matrix = np.array([motion_vector_matrix[x][1:motion_vector_matrix_w-1] for x in range(1,motion_vector_matrix_h-1)])
-    #                here is at [x,y] map to 1d clustered labels
-    cluster_data, motion_vector_at_xy_to_idx = make_cluster_dataset_of_motion_vectors(motion_vector_matrix)
-    #motion_vector_matrix = motion_vector_matrix[1:motion_vector_matrix_h-1,1:motion_vector_matrix_w-1,:,:]
+
+    # cutting for both block mask and frame
     frame_n1_h = len(frame_n1)
     frame_n1_w = len(frame_n1[0])
     frame_n1 = np.array([frame_n1[x][block_size:frame_n1_w-block_size] for x in range(block_size,frame_n1_h-block_size)])
@@ -81,13 +80,14 @@ def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, fram
     #         dydx_tuples.append(tuple(motion_vector_matrix[h][w][0]))
     # print(Counter(dydx_tuples))
     # print(cluster_data)
-    use_threshold_splitting = True
-    if use_threshold_splitting:
+
+
+    if classify_method == "s":
         ##############
-        # threshold splitting
+        # successive threshold splitting
         
         # print("threshold splitting")
-        count_on_dy_dx = collections.defaultdict(int)
+        # count_on_dy_dx = collections.defaultdict(int)
         max_count = 0
         a_block_y_x_of_max_count = None
 
@@ -102,13 +102,13 @@ def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, fram
         descending_dydx_tuples = sorted(dydx_tuples_counts, key=dydx_tuples_counts.get, reverse=True)
         # print(descending_dydx_tuples)
 
-        for h in range(motion_vector_matrix_h):  
-            for w in range(motion_vector_matrix_w):
-                cur_dy_dx = (motion_vector_matrix[h][w][0][0], motion_vector_matrix[h][w][0][1])
-                count_on_dy_dx[cur_dy_dx] += 1
-                if count_on_dy_dx[cur_dy_dx] > max_count:
-                    max_count = count_on_dy_dx[cur_dy_dx]
-                    a_block_y_x_of_max_count = cur_dy_dx
+        # for h in range(motion_vector_matrix_h):  
+        #     for w in range(motion_vector_matrix_w):
+        #         cur_dy_dx = (motion_vector_matrix[h][w][0][0], motion_vector_matrix[h][w][0][1])
+        #         count_on_dy_dx[cur_dy_dx] += 1
+        #         if count_on_dy_dx[cur_dy_dx] > max_count:
+        #             max_count = count_on_dy_dx[cur_dy_dx]
+        #             a_block_y_x_of_max_count = cur_dy_dx
 
         search_start_candidate_number = 0
         for i in range(len(descending_dydx_tuples)):
@@ -175,14 +175,18 @@ def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, fram
                         blocks_class_mask[cur_i][cur_j] = 4
                     else:
                         blocks_class_mask[cur_i][cur_j] = 3
-        pass
 
 
 
-    using_clustering = False
-    if using_clustering:
+
+
+
+    elif classify_method == "c":
         ##############
         # clustering
+        #                here is at [x,y] map to 1d clustered labels
+        cluster_data, motion_vector_at_xy_to_idx = make_cluster_dataset_of_motion_vectors(motion_vector_matrix)
+        #motion_vector_matrix = motion_vector_matrix[1:motion_vector_matrix_h-1,1:motion_vector_matrix_w-1,:,:]
 
         #motion_vector_matrix = motion_vector_matrix[1:motion_vector_matrix_h-1,1:motion_vector_matrix_w-1,:,:]
         frame_n0_h = len(frame_n0)
@@ -226,6 +230,8 @@ def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, fram
         
         # cv2.imshow("frame_n1_RGBA" + str(0), extracted_frame_n1_RGBA_s[0])
         # cv2.waitKey(0)
+    else:
+        raise Exception("do not input correct classification method")
 
     # ps=[]
     # ds=[]
@@ -348,8 +354,8 @@ if __name__ == "__main__":
 
     elif input_type == "vid":
         ##############
-        video_path = "../video_view/Stairs_compact.mp4"
-        video_high_resolution_path = "../video_view/Stairs.mp4"
+        video_path = "../video_view/Finaltest2_compact.mp4"
+        video_high_resolution_path = "../video_view/Finaltest2.mp4"
         # video_path = "D:\\chrome downloads\\final_demo_data\\final_demo_data/test2.mp4"
         # video_path = "/Users/piaomz/Desktop/CSCI576/final_demo_data/test1.mp4"
         splitted1 = video_path.split("/")
@@ -363,7 +369,7 @@ if __name__ == "__main__":
 
     if_calculate_prediction_and_output = True
 
-    use_multiprocessing = False
+    use_multiprocessing = True
 
     # if generate with high resolution, resizeT_cutoutF must be True, resized then calculatr motion vector
     # "hd" generate hd
@@ -373,9 +379,13 @@ if __name__ == "__main__":
     if labeled_generation_mode == "hd":
         all_resolution_frames, fps_dummy = convert_video_2_bgra(video_high_resolution_path)
 
-    block_size = 16
+    # "s" for successive threshold splitting
+    # "c" for clustering
+    classify_method = "c"
+
+    block_size = 12
     search_expand_length = 16
-    frame_predict_step = 20
+    frame_predict_step = 4
     max_best_candidates_per_level = 10
     # block_size = 32
     # search_expand_length = 32
@@ -384,7 +394,7 @@ if __name__ == "__main__":
     search_method = "l"  # h for hierarchical b for brute force l for lucas
                             # if lucas, frame_predict_step need to be 1
 
-    motion_difference_tolerate_thresholds = [3, 3, 1000]
+    motion_difference_tolerate_thresholds = [1, 1, 16*16*2]
     over_this_threshold_count_set_as_search_start_bkg_threshold = 10
     motion_difference_threshold_search_directions = [(1,0),(0,1),(-1,0),(0,-1)]
 
@@ -415,13 +425,13 @@ if __name__ == "__main__":
     print("all", frame_num-frame_predict_step, "iterations")
     if use_multiprocessing:
         print("using parallel processing (CPU)")
-        pool = multiprocessing.Pool(processes=24)
+        pool = multiprocessing.Pool(processes=3)
         parameters_each_iter = []
     # for frame_idx_0 in range(frame_num-frame_predict_step):
     # for frame_idx_0 in range(0, frame_num-frame_predict_step, frame_predict_step):
         # parameters_each_iter.append([frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder])
-        pool.map(partial(main_loop, frame_predict_step = frame_predict_step, input_type = input_type, png_path_prefix = png_path_prefix, frames = frames, resizeT_cutoutF = resizeT_cutoutF, motion_vector_storage = motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold = over_this_threshold_count_set_as_search_start_bkg_threshold, search_method = search_method, max_best_candidates_per_level = max_best_candidates_per_level, motion_difference_threshold_search_directions = motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds = motion_difference_tolerate_thresholds, main_folder = main_folder, block_size = block_size, search_expand_length=search_expand_length, if_calculate_prediction_and_output = if_calculate_prediction_and_output, all_resolution_frames = all_resolution_frames, labeled_generation_mode = labeled_generation_mode), [frame_idx_0 for frame_idx_0 in range(frame_num-frame_predict_step)])
+        pool.map(partial(main_loop, frame_predict_step = frame_predict_step, input_type = input_type, png_path_prefix = png_path_prefix, frames = frames, resizeT_cutoutF = resizeT_cutoutF, motion_vector_storage = motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold = over_this_threshold_count_set_as_search_start_bkg_threshold, search_method = search_method, max_best_candidates_per_level = max_best_candidates_per_level, motion_difference_threshold_search_directions = motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds = motion_difference_tolerate_thresholds, main_folder = main_folder, block_size = block_size, search_expand_length=search_expand_length, if_calculate_prediction_and_output = if_calculate_prediction_and_output, all_resolution_frames = all_resolution_frames, labeled_generation_mode = labeled_generation_mode, classify_method = classify_method), [frame_idx_0 for frame_idx_0 in range(frame_num-frame_predict_step)])
     else:
         for frame_idx_0 in range(frame_num-frame_predict_step):
-            main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, labeled_generation_mode)
+            main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, labeled_generation_mode, classify_method)
 
