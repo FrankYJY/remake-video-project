@@ -7,7 +7,7 @@ import multiprocessing
 import pickle
 from functools import partial
 
-def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, labeled_generation_mode, classify_method):
+def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, labeled_generation_mode, classify_method, average_to_idx_0_each_blockT_append_all_candidatesF):
     print("start", frame_idx_0)
     jump_generated_hd_imgs = False
     if jump_generated_hd_imgs and os.path.exists("./labeled_imgs/"+ main_folder + "/hd_background_0_"+"{:03d}".format(frame_idx_0)+".png") and os.path.exists(    "./labeled_imgs/"+ main_folder + "/hd_foreground_134_"+"{:03d}".format(frame_idx_0)+".png"):
@@ -52,7 +52,7 @@ def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, fram
         storage_file.close()
     else:
         print("calculating motion vector" + str(frame_idx_0))
-        motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, search_method, search_expand_length, max_best_candidates_per_level, if_calculate_prediction_and_output)
+        motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, search_method, search_expand_length, max_best_candidates_per_level, if_calculate_prediction_and_output, average_to_idx_0_each_blockT_append_all_candidatesF)
         if if_calculate_prediction_and_output:
             draw_line_on_predicted(predicted, motion_vector_matrix, block_size)
             save_intermediate_images(frame_n1_Y_blockized, predicted, idx = frame_idx_0)
@@ -94,87 +94,208 @@ def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, fram
         motion_vector_matrix_h = len(motion_vector_matrix)
         motion_vector_matrix_w = len(motion_vector_matrix[0])
 
-        dydx_tuples = []
-        for h in range(motion_vector_matrix_h):
-            for w in range(motion_vector_matrix_w):
-                dydx_tuples.append((int(motion_vector_matrix[h][w][0][0]),int(motion_vector_matrix[h][w][0][1])))
-        dydx_tuples_counts = Counter(dydx_tuples) # (dy,dx): count
-        descending_dydx_tuples = sorted(dydx_tuples_counts, key=dydx_tuples_counts.get, reverse=True)
-        # print(descending_dydx_tuples)
+        if average_to_idx_0_each_blockT_append_all_candidatesF:
+            # did average on index0
+            dydx_tuples = []
+            for h in range(motion_vector_matrix_h):
+                for w in range(motion_vector_matrix_w):
+                    dydx_tuples.append((int(motion_vector_matrix[h][w][0][0]),int(motion_vector_matrix[h][w][0][1])))
+            dydx_tuples_counts = Counter(dydx_tuples) # (dy,dx): count
+            descending_dydx_tuples = sorted(dydx_tuples_counts, key=dydx_tuples_counts.get, reverse=True)
+            # print(descending_dydx_tuples)
 
-        # for h in range(motion_vector_matrix_h):  
-        #     for w in range(motion_vector_matrix_w):
-        #         cur_dy_dx = (motion_vector_matrix[h][w][0][0], motion_vector_matrix[h][w][0][1])
-        #         count_on_dy_dx[cur_dy_dx] += 1
-        #         if count_on_dy_dx[cur_dy_dx] > max_count:
-        #             max_count = count_on_dy_dx[cur_dy_dx]
-        #             a_block_y_x_of_max_count = cur_dy_dx
+            # for h in range(motion_vector_matrix_h):  
+            #     for w in range(motion_vector_matrix_w):
+            #         cur_dy_dx = (motion_vector_matrix[h][w][0][0], motion_vector_matrix[h][w][0][1])
+            #         count_on_dy_dx[cur_dy_dx] += 1
+            #         if count_on_dy_dx[cur_dy_dx] > max_count:
+            #             max_count = count_on_dy_dx[cur_dy_dx]
+            #             a_block_y_x_of_max_count = cur_dy_dx
 
-        search_start_candidate_number = 0
-        for i in range(len(descending_dydx_tuples)):
-            if dydx_tuples_counts[descending_dydx_tuples[i]] < over_this_threshold_count_set_as_search_start_bkg_threshold:
-                break
-            else:
-                search_start_candidate_number = i
+            search_start_candidate_number = 0
+            for j in range(len(descending_dydx_tuples)):
+                if dydx_tuples_counts[descending_dydx_tuples[j]] < over_this_threshold_count_set_as_search_start_bkg_threshold:
+                    break
+                else:
+                    search_start_candidate_number = j
 
-        search_start_blocks_y_x = []
-        for h in range(motion_vector_matrix_h):  
-            for w in range(motion_vector_matrix_w):
-                for ith_most_count_dy_dx in range(search_start_candidate_number):
-                    if int(motion_vector_matrix[h][w][0][0]) == descending_dydx_tuples[ith_most_count_dy_dx][0] and int(motion_vector_matrix[h][w][0][1]) == descending_dydx_tuples[ith_most_count_dy_dx][1]:
-                        search_start_blocks_y_x.append((h,w))
-                        break
-        
-        
-        # a_block_x_y_of_max_count is now search start as background, 2 not searched, 1 is obj, 0 is bkg
-        blocks_class_mask = [[2 for i in range(motion_vector_matrix_w)] for j in range(motion_vector_matrix_h)]
-        for start_y_x in search_start_blocks_y_x:
-            blocks_class_mask[start_y_x[0]][start_y_x[1]] = 0
+            search_start_blocks_y_x = []
+            for h in range(motion_vector_matrix_h):  
+                for w in range(motion_vector_matrix_w):
+                    for ith_most_count_dy_dx in range(search_start_candidate_number):
+                        if int(motion_vector_matrix[h][w][0][0]) == descending_dydx_tuples[ith_most_count_dy_dx][0] and int(motion_vector_matrix[h][w][0][1]) == descending_dydx_tuples[ith_most_count_dy_dx][1]:
+                            search_start_blocks_y_x.append((h,w))
+                            break
+            
+            
+            # a_block_x_y_of_max_count is now search start as background, 2 not searched, 1 is obj, 0 is bkg
+            blocks_class_mask = [[2 for i in range(motion_vector_matrix_w)] for j in range(motion_vector_matrix_h)]
+            for start_y_x in search_start_blocks_y_x:
+                blocks_class_mask[start_y_x[0]][start_y_x[1]] = 0
 
-        # bfs search all the unsearched neigibours, if over tolerant range set as object
-        q = collections.deque(search_start_blocks_y_x)
-        while q:
-            cur_i, cur_j = q.popleft()
-            for direction in motion_difference_threshold_search_directions:
-                nei_i = cur_i + direction[0]
-                nei_j = cur_j + direction[1]
-                if 0 <= nei_i < motion_vector_matrix_h and 0 <= nei_j < motion_vector_matrix_w:
-                    if blocks_class_mask[nei_i][nei_j] == 2:# not searched
-                        is_in_range = True
-                        for i in range(len(motion_difference_tolerate_thresholds)):
-                            threshold = motion_difference_tolerate_thresholds[i]
-                            if abs(motion_vector_matrix[cur_i][cur_j][0][i] - motion_vector_matrix[nei_i][nei_j][0][i]) > threshold:
-                                # out of range
-                                is_in_range = False
-                                blocks_class_mask[nei_i][nei_j] = 1
+            # bfs search all the unsearched neigibours, if over tolerant range set as object
+            q = collections.deque(search_start_blocks_y_x)
+            while q:
+                cur_i, cur_j = q.popleft()
+                for direction in motion_difference_threshold_search_directions:
+                    nei_i = cur_i + direction[0]
+                    nei_j = cur_j + direction[1]
+                    if 0 <= nei_i < motion_vector_matrix_h and 0 <= nei_j < motion_vector_matrix_w:
+                        if blocks_class_mask[nei_i][nei_j] == 2:# not searched
+                            is_in_range = True
+                            for j in range(len(motion_difference_tolerate_thresholds)):
+                                threshold = motion_difference_tolerate_thresholds[j]
+                                if abs(motion_vector_matrix[cur_i][cur_j][0][j] - motion_vector_matrix[nei_i][nei_j][0][j]) > threshold:
+                                    # out of range
+                                    is_in_range = False
+                                    blocks_class_mask[nei_i][nei_j] = 1
+                                    break
+                            if is_in_range:
+                                # q.append((nei_i, nei_j))
+                                blocks_class_mask[nei_i][nei_j] = 0
+
+
+
+            # check all not searched if so steep from others
+            # vote from neighbours
+            #                     bkg    obj
+            #            successive vote
+            mask_label_sets = [set([0,3]), set([1,4])]
+            for cur_i in range(motion_vector_matrix_h):
+                for cur_j in range(motion_vector_matrix_w):
+                    if blocks_class_mask[cur_i][cur_j] == 2:# not searched
+                        neighbour_num = 0
+                        nei_is_obj_vote = 0
+                        for direction in motion_difference_threshold_search_directions:
+                            nei_i = cur_i + direction[0]
+                            nei_j = cur_j + direction[1]
+                            if 0 <= nei_i < motion_vector_matrix_h and 0 <= nei_j < motion_vector_matrix_w:
+                                neighbour_num += 1 # nei exist
+                                if blocks_class_mask[nei_i][nei_j] in mask_label_sets[0]:
+                                    nei_is_obj_vote += 1
+                        if nei_is_obj_vote > neighbour_num/2:
+                            blocks_class_mask[cur_i][cur_j] = 4
+                        else:
+                            blocks_class_mask[cur_i][cur_j] = 3
+        else:
+            # need to deal with all candidates in this block
+            max_count = 0
+            a_block_y_x_of_max_count = None
+
+            motion_vector_matrix_h = len(motion_vector_matrix)
+            motion_vector_matrix_w = len(motion_vector_matrix[0])
+
+            dydx_tuples = []
+            for h in range(motion_vector_matrix_h):
+                for w in range(motion_vector_matrix_w):
+                    for j in range(len(motion_vector_matrix[h][w])):
+                        dydx_tuples.append((int(motion_vector_matrix[h][w][j][0]),int(motion_vector_matrix[h][w][j][1])))
+            dydx_tuples_counts = Counter(dydx_tuples) # (dy,dx): count
+            descending_dydx_tuples = sorted(dydx_tuples_counts, key=dydx_tuples_counts.get, reverse=True)
+            # print(descending_dydx_tuples)
+
+            # for h in range(motion_vector_matrix_h):  
+            #     for w in range(motion_vector_matrix_w):
+            #         cur_dy_dx = (motion_vector_matrix[h][w][0][0], motion_vector_matrix[h][w][0][1])
+            #         count_on_dy_dx[cur_dy_dx] += 1
+            #         if count_on_dy_dx[cur_dy_dx] > max_count:
+            #             max_count = count_on_dy_dx[cur_dy_dx]
+            #             a_block_y_x_of_max_count = cur_dy_dx
+
+            search_start_candidate_number = 0
+            for j in range(len(descending_dydx_tuples)):
+                if dydx_tuples_counts[descending_dydx_tuples[j]] < over_this_threshold_count_set_as_search_start_bkg_threshold:
+                    break
+                else:
+                    search_start_candidate_number = j
+
+            search_start_blocks_y_x = []
+            for h in range(motion_vector_matrix_h):  
+                for w in range(motion_vector_matrix_w):
+                    # all candidates in this block need to be majority labels, make this block search start point
+                    fit_count = 0
+                    for j in range(len(motion_vector_matrix[h][w])):
+                        for ith_most_count_dy_dx in range(search_start_candidate_number):
+                            if int(motion_vector_matrix[h][w][j][0]) == descending_dydx_tuples[ith_most_count_dy_dx][0] and int(motion_vector_matrix[h][w][j][1]) == descending_dydx_tuples[ith_most_count_dy_dx][1]:
+                                fit_count += 1
                                 break
-                        if is_in_range:
-                            # q.append((nei_i, nei_j))
-                            blocks_class_mask[nei_i][nei_j] = 0
+                    # all candidates exist in majority labels
+                    if fit_count == len(motion_vector_matrix[h][w]):
+                        search_start_blocks_y_x.append((h,w))
+            
+            # a_block_x_y_of_max_count is now search start as background, 2 not searched, 1 is obj, 0 is bkg
+            blocks_class_mask = [[2 for i in range(motion_vector_matrix_w)] for j in range(motion_vector_matrix_h)]
+            for start_y_x in search_start_blocks_y_x:
+                blocks_class_mask[start_y_x[0]][start_y_x[1]] = 0
+
+            # calculate average each block for below use
+            blockized_h, blockized_w = get_blockized_height_width(frame_n0, block_size)
+            motion_vector_matrix_averaged = np.zeros([blockized_h//block_size, blockized_w//block_size, 3])
+            added_points_count = np.zeros([blockized_h//block_size, blockized_w//block_size])
+            for cur_block_h in range(motion_vector_matrix_h):
+                for cur_block_w in range(motion_vector_matrix_w):
+                    for j in range(len(motion_vector_matrix[cur_block_h][cur_block_w])):
+                        motion_vector_matrix_averaged[cur_block_h][cur_block_w][0] = np.add(motion_vector_matrix_averaged[cur_block_h][cur_block_w][0], motion_vector_matrix[cur_block_h][cur_block_w][j][0])
+                        motion_vector_matrix_averaged[cur_block_h][cur_block_w][1] = np.add(motion_vector_matrix_averaged[cur_block_h][cur_block_w][1], motion_vector_matrix[cur_block_h][cur_block_w][j][1])
+                        motion_vector_matrix_averaged[cur_block_h][cur_block_w][2] = np.add(motion_vector_matrix_averaged[cur_block_h][cur_block_w][2], motion_vector_matrix[cur_block_h][cur_block_w][j][2])
+                        added_points_count[cur_block_h][cur_block_w] = np.add(added_points_count[cur_block_h][cur_block_w], 1)
+
+            for block_idx_h in range(blockized_h//block_size):
+                for block_idx_w in range(blockized_w//block_size):
+                    # average here
+                    motion_vector_matrix_averaged[block_idx_h][block_idx_w] = np.divide(motion_vector_matrix_averaged[block_idx_h][block_idx_w], added_points_count[cur_block_h][cur_block_w])
+                    # back to SAD
+                    motion_vector_matrix_averaged[block_idx_h][block_idx_w][2] *= block_size * block_size
+
+            # bfs search all the unsearched neigibours, if over tolerant range set as object
+            q = collections.deque(search_start_blocks_y_x)
+            while q:
+                cur_i, cur_j = q.popleft()
+                for direction in motion_difference_threshold_search_directions:
+                    nei_i = cur_i + direction[0]
+                    nei_j = cur_j + direction[1]
+                    if 0 <= nei_i < motion_vector_matrix_h and 0 <= nei_j < motion_vector_matrix_w:
+                        if blocks_class_mask[nei_i][nei_j] == 2:# not searched
+                            is_in_range = True
+                            # all the candidates in this block, each need to fit the threshold, then become sucessive background, else not
+                            for i in range(len(motion_vector_matrix[cur_i][cur_j])):
+                                if not is_in_range:
+                                    break
+                                for j in range(len(motion_difference_tolerate_thresholds)):
+                                    threshold = motion_difference_tolerate_thresholds[j]
+                                    # not in range of neighbour average
+                                    if abs(motion_vector_matrix[cur_i][cur_j][i][j] - motion_vector_matrix_averaged[nei_i][nei_j][j]) > threshold:
+                                        # out of range
+                                        is_in_range = False
+                                        blocks_class_mask[nei_i][nei_j] = 1
+                                        break
+                            if is_in_range:
+                                # q.append((nei_i, nei_j))
+                                blocks_class_mask[nei_i][nei_j] = 0
 
 
 
-        # check all not searched if so steep from others
-        # vote from neighbours
-        #                     bkg    obj
-        #            successive vote
-        mask_label_sets = [set([0,3]), set([1,4])]
-        for cur_i in range(motion_vector_matrix_h):
-            for cur_j in range(motion_vector_matrix_w):
-                if blocks_class_mask[cur_i][cur_j] == 2:# not searched
-                    neighbour_num = 0
-                    nei_is_obj_vote = 0
-                    for direction in motion_difference_threshold_search_directions:
-                        nei_i = cur_i + direction[0]
-                        nei_j = cur_j + direction[1]
-                        if 0 <= nei_i < motion_vector_matrix_h and 0 <= nei_j < motion_vector_matrix_w:
-                            neighbour_num += 1 # nei exist
-                            if blocks_class_mask[nei_i][nei_j] in mask_label_sets[0]:
-                                nei_is_obj_vote += 1
-                    if nei_is_obj_vote > neighbour_num/2:
-                        blocks_class_mask[cur_i][cur_j] = 4
-                    else:
-                        blocks_class_mask[cur_i][cur_j] = 3
+            # check all not searched if so steep from others
+            # vote from neighbours
+            #                     bkg    obj
+            #            successive vote
+            mask_label_sets = [set([0,3]), set([1,4])]
+            for cur_i in range(motion_vector_matrix_h):
+                for cur_j in range(motion_vector_matrix_w):
+                    if blocks_class_mask[cur_i][cur_j] == 2:# not searched
+                        neighbour_num = 0
+                        nei_is_obj_vote = 0
+                        for direction in motion_difference_threshold_search_directions:
+                            nei_i = cur_i + direction[0]
+                            nei_j = cur_j + direction[1]
+                            if 0 <= nei_i < motion_vector_matrix_h and 0 <= nei_j < motion_vector_matrix_w:
+                                neighbour_num += 1 # nei exist
+                                if blocks_class_mask[nei_i][nei_j] in mask_label_sets[0]:
+                                    nei_is_obj_vote += 1
+                        if nei_is_obj_vote > neighbour_num/2:
+                            blocks_class_mask[cur_i][cur_j] = 4
+                        else:
+                            blocks_class_mask[cur_i][cur_j] = 3
 
 
 
@@ -369,7 +490,7 @@ if __name__ == "__main__":
 
     if_calculate_prediction_and_output = True
 
-    use_multiprocessing = True
+    use_multiprocessing = False
 
     # if generate with high resolution, resizeT_cutoutF must be True, resized then calculatr motion vector
     # "hd" generate hd
@@ -379,11 +500,13 @@ if __name__ == "__main__":
     if labeled_generation_mode == "hd":
         all_resolution_frames, fps_dummy = convert_video_2_bgra(video_high_resolution_path)
 
+    average_to_idx_0_each_blockT_append_all_candidatesF = False
+
     # "s" for successive threshold splitting
     # "c" for clustering
     classify_method = "s"
 
-    block_size = 8
+    block_size = 12
     search_expand_length = 16
     frame_predict_step = 4
     max_best_candidates_per_level = 10
@@ -395,7 +518,7 @@ if __name__ == "__main__":
                             # if lucas, frame_predict_step need to be 1
 
     # this can be decimal
-    motion_difference_tolerate_thresholds = [0.5, 0.5, 16*16*2]
+    motion_difference_tolerate_thresholds = [1, 1, 16*16*2]
     over_this_threshold_count_set_as_search_start_bkg_threshold = 10
     motion_difference_threshold_search_directions = [(1,0),(0,1),(-1,0),(0,-1)]
 
@@ -431,8 +554,8 @@ if __name__ == "__main__":
     # for frame_idx_0 in range(frame_num-frame_predict_step):
     # for frame_idx_0 in range(0, frame_num-frame_predict_step, frame_predict_step):
         # parameters_each_iter.append([frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder])
-        pool.map(partial(main_loop, frame_predict_step = frame_predict_step, input_type = input_type, png_path_prefix = png_path_prefix, frames = frames, resizeT_cutoutF = resizeT_cutoutF, motion_vector_storage = motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold = over_this_threshold_count_set_as_search_start_bkg_threshold, search_method = search_method, max_best_candidates_per_level = max_best_candidates_per_level, motion_difference_threshold_search_directions = motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds = motion_difference_tolerate_thresholds, main_folder = main_folder, block_size = block_size, search_expand_length=search_expand_length, if_calculate_prediction_and_output = if_calculate_prediction_and_output, all_resolution_frames = all_resolution_frames, labeled_generation_mode = labeled_generation_mode, classify_method = classify_method), [frame_idx_0 for frame_idx_0 in range(frame_num-frame_predict_step)])
+        pool.map(partial(main_loop, frame_predict_step = frame_predict_step, input_type = input_type, png_path_prefix = png_path_prefix, frames = frames, resizeT_cutoutF = resizeT_cutoutF, motion_vector_storage = motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold = over_this_threshold_count_set_as_search_start_bkg_threshold, search_method = search_method, max_best_candidates_per_level = max_best_candidates_per_level, motion_difference_threshold_search_directions = motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds = motion_difference_tolerate_thresholds, main_folder = main_folder, block_size = block_size, search_expand_length=search_expand_length, if_calculate_prediction_and_output = if_calculate_prediction_and_output, all_resolution_frames = all_resolution_frames, labeled_generation_mode = labeled_generation_mode, classify_method = classify_method, average_to_idx_0_each_blockT_append_all_candidatesF = average_to_idx_0_each_blockT_append_all_candidatesF), [frame_idx_0 for frame_idx_0 in range(frame_num-frame_predict_step)])
     else:
         for frame_idx_0 in range(frame_num-frame_predict_step):
-            main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, labeled_generation_mode, classify_method)
+            main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, labeled_generation_mode, classify_method, average_to_idx_0_each_blockT_append_all_candidatesF)
 

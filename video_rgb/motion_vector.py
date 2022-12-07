@@ -355,8 +355,8 @@ def get_search_area(x, y, frame, block_size, search_expand_length):
     search_area = frame[sy:min(y+search_expand_length+block_size, h), sx:min(x+search_expand_length+block_size, w)]
     return search_area, [sy, min(y+search_expand_length+block_size, h), sx, min(x+search_expand_length+block_size, w)]
 
-def lucas_featured_search(frame_being_searched, frame_base, h, w, blockized_h, blockized_w, block_size, max_best_candidates_per_level):
-    #                                                                     this is the max candidates in a block
+def lucas_featured_search(frame_being_searched, frame_base, h, w, blockized_h, blockized_w, block_size, max_best_candidates_per_level, average_to_idx_0_each_blockT_append_all_candidatesF):
+    #                                                                                              this is the max candidates in a block
     # params for ShiTomasi corner detection
     feature_params = dict(maxCorners=4, qualityLevel=0.01, minDistance=7, blockSize=block_size)
     # Parameters for lucas kanade optical flow
@@ -381,16 +381,16 @@ def lucas_featured_search(frame_being_searched, frame_base, h, w, blockized_h, b
             cur_block_w = int(w/block_size)
             if featured_points_on_each_block_count[cur_block_h][cur_block_w] < 4:
                 # append center
-                new_candidate = np.array([[[w+block_size//2,h+block_size//2]]], dtype = "float32")
-                featured_points = np.append(featured_points, new_candidate, axis = 0)
+                # new_candidate = np.array([[[w+block_size//2,h+block_size//2]]], dtype = "float32")
+                # featured_points = np.append(featured_points, new_candidate, axis = 0)
                 # # append four points
-                # mini_start = block_size//4
-                # mini_step = block_size//2
-                # for mini_related_h in range(mini_start, block_size, mini_step):
-                #     for mini_related_w in range(mini_start, block_size, mini_step):
-                #         new_candidate = np.array([[[w+mini_related_w,h+mini_related_h]]], dtype = "float32")
-                #         featured_points = np.append(featured_points, new_candidate, axis = 0)
-                #         featured_points_on_each_block_count[cur_block_h][cur_block_w] = np.add(featured_points_on_each_block_count[cur_block_h][cur_block_w],1)
+                mini_start = block_size//4
+                mini_step = block_size//2
+                for mini_related_h in range(mini_start, block_size, mini_step):
+                    for mini_related_w in range(mini_start, block_size, mini_step):
+                        new_candidate = np.array([[[w+mini_related_w,h+mini_related_h]]], dtype = "float32")
+                        featured_points = np.append(featured_points, new_candidate, axis = 0)
+                        featured_points_on_each_block_count[cur_block_h][cur_block_w] = np.add(featured_points_on_each_block_count[cur_block_h][cur_block_w],1)
     p1, st, err = cv2.calcOpticalFlowPyrLK(
         base_gray, searched_gray, featured_points, None, **lk_params
     )
@@ -402,32 +402,68 @@ def lucas_featured_search(frame_being_searched, frame_base, h, w, blockized_h, b
             cur_block_w = int(featured_points[i][0][0]//block_size)
             good_result_on_each_block_count[cur_block_h][cur_block_w] = np.add(good_result_on_each_block_count[cur_block_h][cur_block_w], 1)
     
-    # statistic on each block
-    featured_points_dy_dx_SAD = np.zeros([blockized_h//block_size, blockized_w//block_size, 3])
-    added_points_count = np.zeros([blockized_h//block_size, blockized_w//block_size])
-    for i in range(feature_length):
-        cur_block_h, cur_block_w = int(featured_points[i][0][1]/block_size), int(featured_points[i][0][0]/block_size)
-        # if no enough good on this block, add all
-        if good_result_on_each_block_count[cur_block_h][cur_block_w] == 0:
-            featured_points_dy_dx_SAD[cur_block_h][cur_block_w][0] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][0], p1[i][0][1]-featured_points[i][0][1])
-            featured_points_dy_dx_SAD[cur_block_h][cur_block_w][1] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][1], p1[i][0][0]-featured_points[i][0][0])
-            featured_points_dy_dx_SAD[cur_block_h][cur_block_w][2] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][2], err[i])
-            added_points_count[cur_block_h][cur_block_w] += 1
-        else:
-            # if enough good points, only add good ones
-            if st[i] == 1:
+
+    if average_to_idx_0_each_blockT_append_all_candidatesF:
+        # statistic on each block
+        featured_points_dy_dx_SAD = np.zeros([blockized_h//block_size, blockized_w//block_size, 3])
+        added_points_count = np.zeros([blockized_h//block_size, blockized_w//block_size])
+        for i in range(feature_length):
+            cur_block_h, cur_block_w = int(featured_points[i][0][1]/block_size), int(featured_points[i][0][0]/block_size)
+            # if no enough good on this block, add all
+            if good_result_on_each_block_count[cur_block_h][cur_block_w] == 0:
                 featured_points_dy_dx_SAD[cur_block_h][cur_block_w][0] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][0], p1[i][0][1]-featured_points[i][0][1])
                 featured_points_dy_dx_SAD[cur_block_h][cur_block_w][1] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][1], p1[i][0][0]-featured_points[i][0][0])
                 featured_points_dy_dx_SAD[cur_block_h][cur_block_w][2] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][2], err[i])
-                added_points_count[cur_block_h][cur_block_w] = np.add(added_points_count[cur_block_h][cur_block_w], 1)
-    for block_idx_h in range(blockized_h//block_size):
-        for block_idx_w in range(blockized_w//block_size):
-            # averag here, , at [2] is MAD now
-            featured_points_dy_dx_SAD[block_idx_h][block_idx_w] = featured_points_dy_dx_SAD[block_idx_h][block_idx_w]/ added_points_count[cur_block_h][cur_block_w]
-            # back to SAD
-            featured_points_dy_dx_SAD[block_idx_h][block_idx_w][2] *= block_size * block_size
-            # # now the [h][w][0] and [1] are predicted real position
-            # featured_points_dy_dx_SAD[block_idx_h][block_idx_w][0] -= 
+                added_points_count[cur_block_h][cur_block_w] += 1
+            else:
+                # if enough good points, only add good ones
+                if st[i] == 1:
+                    featured_points_dy_dx_SAD[cur_block_h][cur_block_w][0] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][0], p1[i][0][1]-featured_points[i][0][1])
+                    featured_points_dy_dx_SAD[cur_block_h][cur_block_w][1] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][1], p1[i][0][0]-featured_points[i][0][0])
+                    featured_points_dy_dx_SAD[cur_block_h][cur_block_w][2] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][2], err[i])
+                    added_points_count[cur_block_h][cur_block_w] = np.add(added_points_count[cur_block_h][cur_block_w], 1)
+        for block_idx_h in range(blockized_h//block_size):
+            for block_idx_w in range(blockized_w//block_size):
+                # averag here, , at [2] is MAD now
+                featured_points_dy_dx_SAD[block_idx_h][block_idx_w] = featured_points_dy_dx_SAD[block_idx_h][block_idx_w]/ added_points_count[cur_block_h][cur_block_w]
+                # back to SAD
+                featured_points_dy_dx_SAD[block_idx_h][block_idx_w][2] *= block_size * block_size
+                # # now the [h][w][0] and [1] are predicted real position
+                # featured_points_dy_dx_SAD[block_idx_h][block_idx_w][0] -= 
+        motion_vector = featured_points_dy_dx_SAD
+        motion_vector = np.expand_dims(motion_vector, axis=2)
+
+    else:
+        featured_points_dy_dx_SADs = [[[]for i in range(blockized_w//block_size)]for j in range(blockized_h//block_size)]
+        for i in range(feature_length):
+            cur_block_h, cur_block_w = int(featured_points[i][0][1]/block_size), int(featured_points[i][0][0]/block_size)
+            # if no enough good on this block, add all
+            if good_result_on_each_block_count[cur_block_h][cur_block_w] == 0:
+                b = np.array([p1[i][0][1]-featured_points[i][0][1], p1[i][0][0]-featured_points[i][0][0], err[i]])
+                featured_points_dy_dx_SADs[cur_block_h][cur_block_w].append(b)
+                # featured_points_dy_dx_SADs[cur_block_h][cur_block_w]
+                # featured_points_dy_dx_SAD[cur_block_h][cur_block_w][0] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][0], p1[i][0][1]-featured_points[i][0][1])
+                # featured_points_dy_dx_SAD[cur_block_h][cur_block_w][1] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][1], p1[i][0][0]-featured_points[i][0][0])
+                # featured_points_dy_dx_SAD[cur_block_h][cur_block_w][2] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][2], err[i])
+                # added_points_count[cur_block_h][cur_block_w] += 1
+            else:
+                # if enough good points, only add good ones
+                if st[i] == 1:
+                    b = np.array([p1[i][0][1]-featured_points[i][0][1], p1[i][0][0]-featured_points[i][0][0], err[i]])
+                    featured_points_dy_dx_SADs[cur_block_h][cur_block_w].append(b)
+                    # featured_points_dy_dx_SAD[cur_block_h][cur_block_w][0] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][0], p1[i][0][1]-featured_points[i][0][1])
+                    # featured_points_dy_dx_SAD[cur_block_h][cur_block_w][1] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][1], p1[i][0][0]-featured_points[i][0][0])
+                    # featured_points_dy_dx_SAD[cur_block_h][cur_block_w][2] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][2], err[i])
+                    # added_points_count[cur_block_h][cur_block_w] = np.add(added_points_count[cur_block_h][cur_block_w], 1)
+        # for block_idx_h in range(blockized_h//block_size):
+        #     for block_idx_w in range(blockized_w//block_size):
+        #         # averag here, , at [2] is MAD now
+        #         featured_points_dy_dx_SAD[block_idx_h][block_idx_w] = featured_points_dy_dx_SAD[block_idx_h][block_idx_w]/ added_points_count[cur_block_h][cur_block_w]
+        #         # back to SAD
+        #         featured_points_dy_dx_SAD[block_idx_h][block_idx_w][2] *= block_size * block_size
+        #         # # now the [h][w][0] and [1] are predicted real position
+        #         # featured_points_dy_dx_SAD[block_idx_h][block_idx_w][0] -= 
+        motion_vector = featured_points_dy_dx_SADs
 
     # only for show, if draw will save on OUTPUT predicted
     # mask = np.zeros_like(frame_base)
@@ -447,15 +483,14 @@ def lucas_featured_search(frame_being_searched, frame_base, h, w, blockized_h, b
     # k = cv2.waitKey(25) & 0xFF
 
 
-    motion_vector = featured_points_dy_dx_SAD
-    motion_vector = np.expand_dims(motion_vector, axis=2)
+
     return motion_vector
 
         
 
 
 
-def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, method = "h", search_expand_length=16, max_best_candidates_per_level = 10, if_generate_predict_frames = False):
+def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, method = "h", search_expand_length=16, max_best_candidates_per_level = 10, if_generate_predict_frames = False, average_to_idx_0_each_blockT_append_all_candidatesF = True):
     #                            frame n             frame n+1                search_expand_length must be multiple of block_size
     #                                                                      h: hierarchical  b: brute force
     # search  frame_base n+1       in     frame_being_searched n
@@ -475,7 +510,7 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, metho
     matrix = [[None for i in range(w//block_size)] for j in range(h//block_size)]
 
     if method == "l":
-        matrix = motion_vector = lucas_featured_search(frame_being_searched, frame_base, h, w, blockized_h, blockized_w, block_size, max_best_candidates_per_level)
+        matrix = motion_vector = lucas_featured_search(frame_being_searched, frame_base, h, w, blockized_h, blockized_w, block_size, max_best_candidates_per_level, average_to_idx_0_each_blockT_append_all_candidatesF)
         if if_generate_predict_frames:
             for y in range(0, blockized_h, block_size):
                 for x in range(0, blockized_w, block_size):
@@ -685,7 +720,7 @@ if __name__ == "__main__":
     frame_n1_Y_blockized = frame_n1
     # frame_n0_Y_blockized = preprocess_a_frame_to_Y(frame_n0, block_size)
     # frame_n1_Y_blockized = preprocess_a_frame_to_Y(frame_n1, block_size)
-    motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, "b", search_expand_length, if_calculate_prediction_and_output)
+    motion_vector_matrix, predicted = get_motion_vector_matrix(frame_n0_Y_blockized, frame_n1_Y_blockized, block_size, "b", search_expand_length, if_calculate_prediction_and_output, average_to_idx_0_each_blockT_append_all_candidatesF)
     if if_calculate_prediction_and_output:
         draw_line_on_predicted(predicted, motion_vector_matrix, block_size)
         save_intermediate_images(frame_n1_Y_blockized, predicted, idx = temp_store_predicted_in_index)
