@@ -10,6 +10,7 @@ from motion_vector import *
 from getPNGPath import *
 from cluster import *
 
+
 def YCrCb2BGR(image):
     return cv2.cvtColor(image, cv2.COLOR_YCrCb2BGR)
 
@@ -148,6 +149,10 @@ def TSS(block, search_area, block_size, search_expand_length): #3 Step Search
 
     return matchBlock, px_top_left - search_expand_length, py_top_left - search_expand_length
 
+
+from numba import jit, cuda
+
+# @jit(target_backend='cuda') 
 def hierarchical_search(base_block, area_to_searched, block_size, search_expand_length, max_best_candidates_per_level = 1, best_candidates_SAD_no_bigger_than_minSAD_tolerate_range = 500):
     # modified
     #                                                      n must be 2^x            k                                              if set tolerate range, need to set for each level
@@ -349,6 +354,8 @@ def get_search_area(x, y, frame, block_size, search_expand_length):
     sy = max(0, y-search_expand_length) # and get top left corner of search area
     search_area = frame[sy:min(y+search_expand_length+block_size, h), sx:min(x+search_expand_length+block_size, w)]
     return search_area, [sy, min(y+search_expand_length+block_size, h), sx, min(x+search_expand_length+block_size, w)]
+
+
 
 def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, method = "h", search_expand_length=16, max_best_candidates_per_level = 10, if_generate_predict_frames = False):
     #                            frame n             frame n+1                search_expand_length must be multiple of block_size

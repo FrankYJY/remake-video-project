@@ -7,7 +7,8 @@ import multiprocessing
 import pickle
 from functools import partial
 
-def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, is_generate_with_high_resolution):
+def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, labeled_generation_mode):
+    print("start", frame_idx_0)
     frame_idx_1 = frame_idx_0 + frame_predict_step
     if input_type == "img":
         frame_idx_0_path = png_path_prefix + "."+  "{:03d}".format(frame_idx_0 + 1) + ".png"
@@ -70,10 +71,10 @@ def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, fram
     
 
     # just for print
-    dydx_tuples = []
-    for h in range(len(motion_vector_matrix)):
-        for w in range(len(motion_vector_matrix[0])):
-            dydx_tuples.append(tuple(motion_vector_matrix[h][w][0]))
+    # dydx_tuples = []
+    # for h in range(len(motion_vector_matrix)):
+    #     for w in range(len(motion_vector_matrix[0])):
+    #         dydx_tuples.append(tuple(motion_vector_matrix[h][w][0]))
     # print(Counter(dydx_tuples))
     # print(cluster_data)
 
@@ -172,18 +173,23 @@ def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, fram
 
 
 
-    if is_generate_with_high_resolution:
-        ratio_h = len(all_resolution_frames)/len(frame_n1)
-        ratio_w = len(all_resolution_frames[0])/len(frame_n1[0])
-        frame_n1_RGBA_base = cv2.cvtColor(all_resolution_frames, cv2.COLOR_RGB2RGBA)
+    if labeled_generation_mode == "hd":
+        all_resolution_frame = all_resolution_frames[frame_idx_1]
+        # cut edges
+        ratio_h = len(all_resolution_frame)/len(frame_n1)
+        ratio_w = len(all_resolution_frame[0])/len(frame_n1[0])
+        all_resolution_frame = np.array([all_resolution_frame[x][int(block_size * ratio_w):len(all_resolution_frame[0])-int(block_size * ratio_w)] for x in range(int(block_size * ratio_h),len(all_resolution_frame)-int(block_size * ratio_h))])
+        ratio_h = len(all_resolution_frame)/len(frame_n1)
+        ratio_w = len(all_resolution_frame[0])/len(frame_n1[0])
+        frame_n1_RGBA_base = cv2.cvtColor(all_resolution_frame, cv2.COLOR_RGB2RGBA)
         extracted_frame_n1_RGBA_s = []
         for mask_label_set in [set([0]),set([1,3,4])]:
         # for mask_label_set in mask_label_sets:
             frame_n1_RGBA = frame_n1_RGBA_base.copy()
             for w in range(frame_n1_RGBA.shape[1]):
                 for h in range(frame_n1_RGBA.shape[0]):
-                    h_idx = h // (block_size * ratio_h)
-                    w_idx = w // (block_size * ratio_w)
+                    h_idx = int(h / (block_size * ratio_h))
+                    w_idx = int(w / (block_size * ratio_w))
                     if blocks_class_mask[h_idx][w_idx] in mask_label_set:
                         frame_n1_RGBA[h][w][3] = 255
                     else:
@@ -191,12 +197,9 @@ def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, fram
             extracted_frame_n1_RGBA_s.append(frame_n1_RGBA)
             # cv2.imshow("frame_n1_RGBA" + str(mask_label_set), frame_n1_RGBA)
         # cv2.waitKey(0)
-        if not os.path.exists("./labeled_imgs/"+ main_folder):
-            os.mkdir("./labeled_imgs")
-            os.mkdir("./labeled_imgs/"+ main_folder)
-        cv2.imwrite("./labeled_imgs/"+ main_folder + "/background_0_"+"{:03d}".format(frame_idx_0)+".png", extracted_frame_n1_RGBA_s[0])
-        cv2.imwrite("./labeled_imgs/"+ main_folder + "/foreground_134_"+"{:03d}".format(frame_idx_0)+".png", extracted_frame_n1_RGBA_s[1])
-    else:
+        cv2.imwrite("./labeled_imgs/"+ main_folder + "/hd_background_0_"+"{:03d}".format(frame_idx_0)+".png", extracted_frame_n1_RGBA_s[0])
+        cv2.imwrite("./labeled_imgs/"+ main_folder + "/hd_foreground_134_"+"{:03d}".format(frame_idx_0)+".png", extracted_frame_n1_RGBA_s[1])
+    elif labeled_generation_mode == "c":
         frame_n1_RGBA_base = cv2.cvtColor(frame_n1, cv2.COLOR_RGB2RGBA)
         extracted_frame_n1_RGBA_s = []
         for mask_label_set in [set([0]),set([1,3,4])]:
@@ -219,6 +222,7 @@ def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, fram
         cv2.imwrite("./labeled_imgs/"+ main_folder + "/background_0_"+"{:03d}".format(frame_idx_0)+".png", extracted_frame_n1_RGBA_s[0])
         cv2.imwrite("./labeled_imgs/"+ main_folder + "/foreground_134_"+"{:03d}".format(frame_idx_0)+".png", extracted_frame_n1_RGBA_s[1])
 
+    print("finish", frame_idx_0)
     return
     ##############
     # clustering
@@ -333,8 +337,8 @@ if __name__ == "__main__":
 
     elif input_type == "vid":
         ##############
-        video_path = "../video_view/Finaltest1_compact.mp4"
-        video_high_resolution_path = "../video_view/Finaltest1.mp4"
+        video_path = "../video_view/Finaltest2_compact.mp4"
+        video_high_resolution_path = "../video_view/Finaltest2.mp4"
         # video_path = "D:\\chrome downloads\\final_demo_data\\final_demo_data/test2.mp4"
         # video_path = "/Users/piaomz/Desktop/CSCI576/final_demo_data/test1.mp4"
         splitted1 = video_path.split("/")
@@ -344,11 +348,19 @@ if __name__ == "__main__":
         main_folder = splitted2[-1].split(".")[0]
         frames, fps = convert_video_2_bgra(video_path)
         frame_num = len(frames)
-        all_resolution_frames, fps_dummy = convert_video_2_bgra(video_high_resolution_path)
+
 
     if_calculate_prediction_and_output = True
 
-    is_generate_with_high_resolution = True
+    use_multiprocessing = True
+
+    # if generate with high resolution, resizeT_cutoutF must be True, resized then calculatr motion vector
+    # "hd" generate hd
+    # "c" generate compacted
+    # else pass
+    labeled_generation_mode = "hd"
+    if labeled_generation_mode == "hd":
+        all_resolution_frames, fps_dummy = convert_video_2_bgra(video_high_resolution_path)
 
     block_size = 16
     search_expand_length = 16
@@ -360,7 +372,7 @@ if __name__ == "__main__":
     resizeT_cutoutF = True
     search_method = "h"  # h for hierarchical b for brute force
 
-    motion_difference_tolerate_thresholds = [2, 2, 1000]
+    motion_difference_tolerate_thresholds = [4, 4, 1000]
     over_this_threshold_count_set_as_search_start_bkg_threshold = 10
     motion_difference_threshold_search_directions = [(1,0),(0,1),(-1,0),(0,-1)]
 
@@ -377,14 +389,24 @@ if __name__ == "__main__":
     motion_vector_storage = "./motion_vector_storage/" + folder_prefix
     if not os.path.exists(motion_vector_storage):
         os.makedirs(motion_vector_storage)
+    if not os.path.exists("./labeled_imgs"):
+        os.mkdir("./labeled_imgs")
+    if not os.path.exists("./labeled_imgs/"+ main_folder):
+        os.mkdir("./labeled_imgs/"+ main_folder)
 
     wholePanorama=np.array([])
     centerPoint=[0,0]
-    pool = multiprocessing.Pool(processes=8)
-    parameters_each_iter = []
+
+    print("all", frame_num-frame_predict_step, "iterations")
+    if use_multiprocessing:
+        print("using parallel processing (CPU)")
+        pool = multiprocessing.Pool(processes=8)
+        parameters_each_iter = []
     # for frame_idx_0 in range(frame_num-frame_predict_step):
     # for frame_idx_0 in range(0, frame_num-frame_predict_step, frame_predict_step):
         # parameters_each_iter.append([frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder])
-    pool.map(partial(main_loop, frame_predict_step = frame_predict_step, input_type = input_type, png_path_prefix = png_path_prefix, frames = frames, resizeT_cutoutF = resizeT_cutoutF, motion_vector_storage = motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold = over_this_threshold_count_set_as_search_start_bkg_threshold, search_method = search_method, max_best_candidates_per_level = max_best_candidates_per_level, motion_difference_threshold_search_directions = motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds = motion_difference_tolerate_thresholds, main_folder = main_folder, block_size = block_size, search_expand_length=search_expand_length, if_calculate_prediction_and_output = if_calculate_prediction_and_output, all_resolution_frames = all_resolution_frames, is_generate_with_high_resolution = is_generate_with_high_resolution), [frame_idx_0 for frame_idx_0 in range(frame_num-frame_predict_step)])
-        # main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder)
+        pool.map(partial(main_loop, frame_predict_step = frame_predict_step, input_type = input_type, png_path_prefix = png_path_prefix, frames = frames, resizeT_cutoutF = resizeT_cutoutF, motion_vector_storage = motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold = over_this_threshold_count_set_as_search_start_bkg_threshold, search_method = search_method, max_best_candidates_per_level = max_best_candidates_per_level, motion_difference_threshold_search_directions = motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds = motion_difference_tolerate_thresholds, main_folder = main_folder, block_size = block_size, search_expand_length=search_expand_length, if_calculate_prediction_and_output = if_calculate_prediction_and_output, all_resolution_frames = all_resolution_frames, labeled_generation_mode = labeled_generation_mode), [frame_idx_0 for frame_idx_0 in range(frame_num-frame_predict_step)])
+    else:
+        for frame_idx_0 in range(frame_num-frame_predict_step):
+            main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, is_generate_with_high_resolution)
 

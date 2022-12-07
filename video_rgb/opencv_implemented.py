@@ -21,8 +21,12 @@ def lucas_kanade_method(video_path):
     p0 = cv2.goodFeaturesToTrack(old_gray, mask=None, **feature_params)
     # Create a mask image for drawing purposes
     mask = np.zeros_like(old_frame)
+    p0 = []
+    for h in range(len(0, old_gray, 16)):
+        for w in range(0, len(old_gray[0], 16)):
+            p0.append((h,w))
     while True:
-        p0 = cv2.goodFeaturesToTrack(old_gray, mask=None, **feature_params)
+        # p0 = cv2.goodFeaturesToTrack(old_gray, mask=None, **feature_params)
         ret, frame = cap.read()
         if not ret:
             break
