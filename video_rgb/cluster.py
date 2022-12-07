@@ -10,7 +10,7 @@ from sklearn.metrics import silhouette_score
 from collections import Counter
 import numpy as np
 
-def cluster(points,eps=1,n_clusters=2):
+def cluster(points,eps=0.2,n_clusters=2):
     '''
     features, true_labels = make_moons(
         n_samples=250, noise=0.05, random_state=42
@@ -43,11 +43,11 @@ def cluster(points,eps=1,n_clusters=2):
     dbscan.fit(scaled_features)
 
     # Compute the silhouette scores for each algorithm
-    '''
+    
     kmeans_silhouette = silhouette_score(
         scaled_features, kmeans.labels_
     ).round(2)
-    '''
+    
     
     
     # dbscan_silhouette = silhouette_score(
@@ -58,7 +58,7 @@ def cluster(points,eps=1,n_clusters=2):
     # print(dbscan.labels_)
     
     
-    #plt.scatter([item[0] for item in features],[item[1] for item in features],label="stars")
+    plt.scatter([item[0] for item in features],[item[1] for item in features],label="stars")
     fte_colors = {
         0: "#008fd5",
         1: "#fc4f30",
@@ -71,29 +71,31 @@ def cluster(points,eps=1,n_clusters=2):
     #print(scaled_features[:][1])
     plt.scatter([item[0] for item in features],[item[1] for item in features], c=dbscan.labels_,cmap="coolwarm")
     
-    plt.scatter([xmean],[ymean], s=50,c='b')
+    # plt.scatter([xmean],[ymean], s=50,c='b')
     # plt.show()
-    '''
-    # Plot the data and cluster silhouette comparison
-    fig, (ax1, ax2) = plt.subplots(
-        1, 2, figsize=(8, 8), sharex=True, sharey=True
-    )
-    fig.suptitle(f"Clustering Algorithm Comparison: Crescents", fontsize=16)
-    fte_colors = {
-        0: "#008fd5",
-        1: "#fc4f30",
-        2:"#00d724",
-        3:'#000000'
-        
-    }
-    # The k-means plot
-    km_colors = [fte_colors[label] for label in kmeans.labels_]
-    ax1.scatter(scaled_features[:][0], scaled_features[:][1], c=km_colors)
-    ax1.set_title(
-        f"k-means\nSilhouette: {kmeans_silhouette}", fontdict={"fontsize": 12}
-    )
-    plt.show()
     
+    # # Plot the data and cluster silhouette comparison
+    # fig, (ax1, ax2) = plt.subplots(
+    #     1, 2, figsize=(8, 8), sharex=True, sharey=True
+    # )
+    # fig.suptitle(f"Clustering Algorithm Comparison: Crescents", fontsize=16)
+    # fte_colors = {
+    #     0: "#008fd5",
+    #     1: "#fc4f30",
+    #     2:"#00d724",
+    #     3:'#000000'
+        
+    # }
+    # The k-means plot
+    
+    # km_colors = [fte_colors[label] for label in kmeans.labels_]
+    # ax1.scatter(scaled_features[:][0], scaled_features[:][1], c=km_colors)
+    # ax1.set_title(
+    #     f"k-means\nSilhouette: {kmeans_silhouette}", fontdict={"fontsize": 12}
+    # )
+    # plt.show()
+    
+    '''
     # The dbscan plot
     
     db_colors = [fte_colors[label] for label in dbscan.labels_]

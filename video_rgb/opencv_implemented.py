@@ -6,27 +6,40 @@ import numpy as np
 def lucas_kanade_method(video_path):
     cap = cv2.VideoCapture(video_path)
     # params for ShiTomasi corner detection
-    feature_params = dict(maxCorners=100000, qualityLevel=0.01, minDistance=7, blockSize=16)
+    feature_params = dict(maxCorners=10000, qualityLevel=0.001, minDistance=3, blockSize=16)
     # Parameters for lucas kanade optical flow
     lk_params = dict(
-        winSize=(15, 15),
+        winSize=(16, 16),
         maxLevel=4,
-        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.03),
+        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),
     )
     # Create some random colors
     color = np.random.randint(0, 255, (100000, 3))
     # Take first frame and find corners in it
     ret, old_frame = cap.read()
+
+
+
     old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
-    p0 = cv2.goodFeaturesToTrack(old_gray, mask=None, **feature_params)
-    # Create a mask image for drawing purposes
-    mask = np.zeros_like(old_frame)
-    p0 = []
-    for h in range(len(0, old_gray, 16)):
-        for w in range(0, len(old_gray[0], 16)):
-            p0.append((h,w))
     while True:
-        # p0 = cv2.goodFeaturesToTrack(old_gray, mask=None, **feature_params)
+        p0 = cv2.goodFeaturesToTrack(old_gray, mask=None, **feature_params)
+        # Create a mask image for drawing purposes
+        mask = np.zeros_like(old_frame)
+        # p0 = np.empty(shape=(0, 1, 2), dtype= "float32")
+        step = 16 * 4
+        for h in range(0, len(old_gray[0]), step):
+            for w in range(0, len(old_gray), step):
+                block = old_gray[h:h+step][w:w+step]
+                features_in_block = cv2.goodFeaturesToTrack(block, mask=None, **feature_params)
+
+                if features_in_block is None:
+                    # features_in_block = np.array([[[h+step/4,w+step/4]], [[h+step/4,w+step/4*3]], [[h+step/4*3,w+step/4]], [[h+step/4*3,w+step/4*3]]], dtype = "float32")
+                    features_in_block = np.array([[[h+step/4,w+step/4]], [[h+step/4*3,w+step/4]]], dtype = "float32")
+                else:
+                    for feature in features_in_block:
+                        feature[0][0] += w
+                        feature[0][1] += h
+                p0 = np.append(p0, features_in_block, axis = 0)
         ret, frame = cap.read()
         if not ret:
             break
@@ -39,13 +52,17 @@ def lucas_kanade_method(video_path):
         #     old_frame, frame, p0, None, **lk_params
         # )
         # Select good points
-        good_new = p1[st == 1]
-        good_old = p0[st == 1]
+        # good_new = p1[st == 1]
+        # good_old = p0[st == 1]
+        good_new = p1
+        good_old = p0
         # draw the tracks
         for i, (new, old) in enumerate(zip(good_new, good_old)):
             a, b = new.ravel()
             c, d = old.ravel()
+            mask = cv2.line(mask, (int(a), int(b)), (int(c), int(d)), (0,0,255), 2)
             # mask = cv2.line(mask, (int(a), int(b)), (int(c), int(d)), color[i].tolist(), 2)
+            # mask = cv2.circle(mask, (int(a), int(b)), 5, color[i].tolist(), -1)
             frame = cv2.circle(frame, (int(a), int(b)), 5, color[i].tolist(), -1)
         img = cv2.add(frame, mask)
         cv2.imshow("frame", img)
@@ -126,7 +143,7 @@ def main():
     #     method = cv2.optflow.calcOpticalFlowDenseRLOF
     #     dense_optical_flow(method, video_path)
 
-    video_path = "../video_view/Finaltest1.mp4"
+    video_path = "../video_view/video1.mp4"
 
     lucas_kanade_method(video_path)
     # method = cv2.optflow.calcOpticalFlowSparseToDense

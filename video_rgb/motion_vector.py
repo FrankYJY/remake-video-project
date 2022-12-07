@@ -355,6 +355,104 @@ def get_search_area(x, y, frame, block_size, search_expand_length):
     search_area = frame[sy:min(y+search_expand_length+block_size, h), sx:min(x+search_expand_length+block_size, w)]
     return search_area, [sy, min(y+search_expand_length+block_size, h), sx, min(x+search_expand_length+block_size, w)]
 
+def lucas_featured_search(frame_being_searched, frame_base, h, w, blockized_h, blockized_w, block_size, max_best_candidates_per_level):
+    #                                                                     this is the max candidates in a block
+    # params for ShiTomasi corner detection
+    feature_params = dict(maxCorners=4, qualityLevel=0.01, minDistance=7, blockSize=block_size)
+    # Parameters for lucas kanade optical flow
+    lk_params = dict(
+        winSize=(block_size, block_size),
+        maxLevel=4,
+        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),
+    )
+    base_gray = cv2.cvtColor(frame_base, cv2.COLOR_BGR2GRAY)
+    searched_gray = cv2.cvtColor(frame_being_searched, cv2.COLOR_BGR2GRAY)
+    # !!!!!!! this is x, y
+    featured_points = cv2.goodFeaturesToTrack(base_gray, mask=None, **feature_params)
+    featured_points_on_each_block_count = np.zeros([blockized_h//block_size, blockized_w//block_size])
+    # points_on_base_to_search = [[[]for i in range(blockized_w//block_size)]for j in range(blockized_h//block_size)]
+    for featured_point in featured_points:
+        cur_block_w = int(featured_point[0][0]/block_size)
+        cur_block_h = int(featured_point[0][1]/block_size)
+        featured_points_on_each_block_count[cur_block_h][cur_block_w] = np.add(featured_points_on_each_block_count[cur_block_h][cur_block_w],1)
+    for h in range(0, blockized_h, block_size):
+        for w in range(0, blockized_w, block_size):
+            cur_block_h = int(h/block_size)
+            cur_block_w = int(w/block_size)
+            if featured_points_on_each_block_count[cur_block_h][cur_block_w] < 4:
+                # append center
+                new_candidate = np.array([[[w+block_size//2,h+block_size//2]]], dtype = "float32")
+                featured_points = np.append(featured_points, new_candidate, axis = 0)
+                # # append four points
+                # mini_start = block_size//4
+                # mini_step = block_size//2
+                # for mini_related_h in range(mini_start, block_size, mini_step):
+                #     for mini_related_w in range(mini_start, block_size, mini_step):
+                #         new_candidate = np.array([[[w+mini_related_w,h+mini_related_h]]], dtype = "float32")
+                #         featured_points = np.append(featured_points, new_candidate, axis = 0)
+                #         featured_points_on_each_block_count[cur_block_h][cur_block_w] = np.add(featured_points_on_each_block_count[cur_block_h][cur_block_w],1)
+    p1, st, err = cv2.calcOpticalFlowPyrLK(
+        base_gray, searched_gray, featured_points, None, **lk_params
+    )
+    feature_length = p1.shape[0]
+    good_result_on_each_block_count = np.zeros([blockized_h//block_size, blockized_w//block_size])
+    for i in range(feature_length):
+        if st[i] == 1:
+            cur_block_h = int(featured_points[i][0][1]//block_size)
+            cur_block_w = int(featured_points[i][0][0]//block_size)
+            good_result_on_each_block_count[cur_block_h][cur_block_w] = np.add(good_result_on_each_block_count[cur_block_h][cur_block_w], 1)
+    
+    # statistic on each block
+    featured_points_dy_dx_SAD = np.zeros([blockized_h//block_size, blockized_w//block_size, 3])
+    added_points_count = np.zeros([blockized_h//block_size, blockized_w//block_size])
+    for i in range(feature_length):
+        cur_block_h, cur_block_w = int(featured_points[i][0][1]/block_size), int(featured_points[i][0][0]/block_size)
+        # if no enough good on this block, add all
+        if good_result_on_each_block_count[cur_block_h][cur_block_w] == 0:
+            featured_points_dy_dx_SAD[cur_block_h][cur_block_w][0] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][0], p1[i][0][1]-featured_points[i][0][1])
+            featured_points_dy_dx_SAD[cur_block_h][cur_block_w][1] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][1], p1[i][0][0]-featured_points[i][0][0])
+            featured_points_dy_dx_SAD[cur_block_h][cur_block_w][2] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][2], err[i])
+            added_points_count[cur_block_h][cur_block_w] += 1
+        else:
+            # if enough good points, only add good ones
+            if st[i] == 1:
+                featured_points_dy_dx_SAD[cur_block_h][cur_block_w][0] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][0], p1[i][0][1]-featured_points[i][0][1])
+                featured_points_dy_dx_SAD[cur_block_h][cur_block_w][1] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][1], p1[i][0][0]-featured_points[i][0][0])
+                featured_points_dy_dx_SAD[cur_block_h][cur_block_w][2] = np.add(featured_points_dy_dx_SAD[cur_block_h][cur_block_w][2], err[i])
+                added_points_count[cur_block_h][cur_block_w] = np.add(added_points_count[cur_block_h][cur_block_w], 1)
+    for block_idx_h in range(blockized_h//block_size):
+        for block_idx_w in range(blockized_w//block_size):
+            # averag here, , at [2] is MAD now
+            featured_points_dy_dx_SAD[block_idx_h][block_idx_w] = featured_points_dy_dx_SAD[block_idx_h][block_idx_w]/ added_points_count[cur_block_h][cur_block_w]
+            # back to SAD
+            featured_points_dy_dx_SAD[block_idx_h][block_idx_w][2] *= block_size * block_size
+            # # now the [h][w][0] and [1] are predicted real position
+            # featured_points_dy_dx_SAD[block_idx_h][block_idx_w][0] -= 
+
+    # only for show, if draw will save on OUTPUT predicted
+    # mask = np.zeros_like(frame_base)
+    # color = np.random.randint(0, 255, (100000, 3))
+    # good_new = p1
+    # good_old = featured_points
+    # # draw the tracks
+    # for i, (new, old) in enumerate(zip(good_new, good_old)):
+    #     a, b = new.ravel()
+    #     c, d = old.ravel()
+    #     mask = cv2.line(mask, (int(a), int(b)), (int(c), int(d)), (255,255,255), 1)
+    #     # mask = cv2.line(mask, (int(a), int(b)), (int(c), int(d)), color[i].tolist(), 2)
+    #     # mask = cv2.circle(mask, (int(a), int(b)), 5, color[i].tolist(), -1)
+    #     frame = cv2.circle(frame_being_searched, (int(a), int(b)), 5, color[i].tolist(), 0)
+    # img = cv2.add(frame, mask)
+    # cv2.imshow("frame", img)
+    # k = cv2.waitKey(25) & 0xFF
+
+
+    motion_vector = featured_points_dy_dx_SAD
+    motion_vector = np.expand_dims(motion_vector, axis=2)
+    return motion_vector
+
+        
+
 
 
 def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, method = "h", search_expand_length=16, max_best_candidates_per_level = 10, if_generate_predict_frames = False):
@@ -376,57 +474,70 @@ def get_motion_vector_matrix(frame_being_searched, frame_base, block_size, metho
     bcount = 0
     matrix = [[None for i in range(w//block_size)] for j in range(h//block_size)]
 
+    if method == "l":
+        matrix = motion_vector = lucas_featured_search(frame_being_searched, frame_base, h, w, blockized_h, blockized_w, block_size, max_best_candidates_per_level)
+        if if_generate_predict_frames:
+            for y in range(0, blockized_h, block_size):
+                for x in range(0, blockized_w, block_size):
+                    block_idx_h = y//block_size
+                    block_idx_w = x//block_size
+                    # dy dx could be anywhere in lucas
+
+                    match_y = min(max(y+int(motion_vector[block_idx_h][block_idx_w][0][0]), 0), blockized_h-block_size)
+                    match_x = min(max(x+int(motion_vector[block_idx_h][block_idx_w][0][1]), 0), blockized_w-block_size)
+                    predicted[y:y+block_size, x:x+block_size] = frame_being_searched[match_y:match_y+block_size, match_x:match_x+block_size]
     # for each block
-    for y in range(0, blockized_h, block_size):
-        for x in range(0, blockized_w, block_size):
-            bcount += 1
-            base_block = frame_base[y:y+block_size, x:x+block_size]
-            search_area, indices = get_search_area(x, y, frame_being_searched, block_size, search_expand_length)
-            # print(cur_block.shape, search_area.shape)
-            # matchBlock, dx, dy = TSS(cur_block, search_area, block_size, search_expand_length)
-            # print(dx, dy)
-            
-            # best_matches is not the motion vector, is based on clipped search area
-            if method == "h":
-                best_matches, SAD = hierarchical_search(base_block, search_area, block_size, search_expand_length, max_best_candidates_per_level)
-            elif method == "b":
-                best_matches, SAD = optimized_brute_force_search(base_block, search_area, block_size, search_expand_length, max_best_candidates_per_level)
-            else:
-                raise Exception("do not input correct method code")
+    else:
+        for y in range(0, blockized_h, block_size):
+            for x in range(0, blockized_w, block_size):
+                bcount += 1
+                base_block = frame_base[y:y+block_size, x:x+block_size]
+                search_area, indices = get_search_area(x, y, frame_being_searched, block_size, search_expand_length)
+                # print(cur_block.shape, search_area.shape)
+                # matchBlock, dx, dy = TSS(cur_block, search_area, block_size, search_expand_length)
+                # print(dx, dy)
+                
+                # best_matches is not the motion vector, is based on clipped search area
+                if method == "h":
+                    best_matches, SAD = hierarchical_search(base_block, search_area, block_size, search_expand_length, max_best_candidates_per_level)
+                elif method == "b":
+                    best_matches, SAD = optimized_brute_force_search(base_block, search_area, block_size, search_expand_length, max_best_candidates_per_level)
+                else:
+                    raise Exception("do not input correct method code")
 
-            MAD = SAD//(block_size*block_size) # this is MAD
+                MAD = SAD//(block_size*block_size) # this is MAD
 
-            # multiple candidates usually adjacent, take average
-            if len(best_matches) > 1:
-                # print before set avg to position 0
-                print("multiple best candidates dx dy in block, minus expand length later, SAD", SAD, best_matches, "at", y, x)
-                temp0 = 0
-                temp1 = 0
-                templ = len(best_matches)
-                for i in range(templ):
-                    temp0 += best_matches[i][0]
-                    temp1 += best_matches[i][1]
-                avg_coord1 = temp0//templ
-                avg_coord2 = temp1//templ
-                best_matches[0] = (avg_coord1, avg_coord2)
-    
+                # multiple candidates usually adjacent, take average
+                if len(best_matches) > 1:
+                    # print before set avg to position 0
+                    print("multiple best candidates dx dy in block, minus expand length later, SAD", SAD, best_matches, "at", y, x)
+                    temp0 = 0
+                    temp1 = 0
+                    templ = len(best_matches)
+                    for i in range(templ):
+                        temp0 += best_matches[i][0]
+                        temp1 += best_matches[i][1]
+                    avg_coord1 = temp0//templ
+                    avg_coord2 = temp1//templ
+                    best_matches[0] = (avg_coord1, avg_coord2)
+        
 
-            motion_vectors = []
-            for best_match in best_matches:
-                match_relative_y, match_relative_x = best_match
-                match_y = match_relative_y + max(0, y-search_expand_length) # match position in n
-                match_x = match_relative_x + max(0, x-search_expand_length)
-                dx = x - match_x
-                dy = y - match_y
-                # if dx != 0 or dy != 0:
-                #     print(y,x, match_y,match_x,dy,dx,SAD, indices, search_area.shape)
-                motion_vectors.append([dy , dx, SAD])
+                motion_vectors = []
+                for best_match in best_matches:
+                    match_relative_y, match_relative_x = best_match
+                    match_y = match_relative_y + max(0, y-search_expand_length) # match position in n
+                    match_x = match_relative_x + max(0, x-search_expand_length)
+                    dx = x - match_x
+                    dy = y - match_y
+                    # if dx != 0 or dy != 0:
+                    #     print(y,x, match_y,match_x,dy,dx,SAD, indices, search_area.shape)
+                    motion_vectors.append([dy , dx, SAD])
 
-            # motion points from n to n+1
-            # [y][x][candidate idx][0:dy 1:x]
-            matrix[y//block_size][x//block_size] = motion_vectors
-            if if_generate_predict_frames:
-                predicted[y:y+block_size, x:x+block_size] = frame_being_searched[match_y:match_y+block_size, match_x:match_x+block_size]
+                # motion points from n to n+1
+                # [y][x][candidate idx][0:dy 1:x]
+                matrix[y//block_size][x//block_size] = motion_vectors
+                if if_generate_predict_frames:
+                    predicted[y:y+block_size, x:x+block_size] = frame_being_searched[match_y:match_y+block_size, match_x:match_x+block_size]
 
     # assert bcount == int(blockized_h / block_size * blockized_w / block_size) #check all macroblocks are accounted for
     return matrix, predicted
@@ -486,7 +597,7 @@ def draw_a_line_on_predicted(h, w, d, vector_y, vector_x, block_size, motion_vec
     deltax = x1-x0
     deltay = abs(y1-y0)
     error = deltax//2
-    y = y0
+    y = min(max(int(y0), 0), h-1)
     ystep = 1 if y0<y1 else -1
     if d == 1:
         color = 255
@@ -496,12 +607,12 @@ def draw_a_line_on_predicted(h, w, d, vector_y, vector_x, block_size, motion_vec
         color = [0, 255, 0, 255]
     else:
         raise Exception("color depth neither 1 or 3, in drawing line in prediction")
-    for x in range(x0, x1):
+    for x in range(max(0,int(x0)), min(int(x1), w-1)):
         if steep:
             #(y,x) is position following (x, y) format
             # predicted following (y, x) format
             if 0<=y<h and 0 <=x<w:
-                predicted[x][y] = color
+                predicted[y][x] = color
         else:#(x,y)
             if 0<=y<h and 0 <=x<w:
                 predicted[y][x] = color
