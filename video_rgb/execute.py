@@ -341,7 +341,7 @@ if __name__ == "__main__":
 
     elif input_type == "vid":
         ##############
-        video_path = "../video_view/Stairs_compact.mp4"
+        video_path = "../video_view/video2_compact.mp4"
         video_high_resolution_path = "../video_view/Finaltest1.mp4"
         # video_path = "D:\\chrome downloads\\final_demo_data\\final_demo_data/test2.mp4"
         # video_path = "/Users/piaomz/Desktop/CSCI576/final_demo_data/test1.mp4"
@@ -404,7 +404,7 @@ if __name__ == "__main__":
     print("all", frame_num-frame_predict_step, "iterations")
     if use_multiprocessing:
         print("using parallel processing (CPU)")
-        pool = multiprocessing.Pool(processes=8)
+        pool = multiprocessing.Pool(processes=24)
         parameters_each_iter = []
     # for frame_idx_0 in range(frame_num-frame_predict_step):
     # for frame_idx_0 in range(0, frame_num-frame_predict_step, frame_predict_step):
