@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import os
+import collections
 #input the video path
 #output an array [number of frame]*[h]*[w]*[4] BGRA and the fps of the video
 def convert_video_2_bgra(video_path):
@@ -15,14 +16,13 @@ def convert_video_2_bgra(video_path):
         ret, frame = cap.read()
         if not ret:
             break
-        # bgra = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
-        bgra = frame
+        bgra = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         arr.append(bgra)
         #arr.append(frame)
         #if(cv2.waitKey(1)==ord('q')):
           #  break
     cap.release()
-    cv2.destroyAllWindows()
+    #cv2.destroyAllWindows()
 
     return (arr,fps)
 
@@ -130,21 +130,20 @@ def app_two_create_video(foreground_frame_arr, background_panorama, fps, video_h
 #input foreground_frame_object_arr [num of object][number of frame][h][w][4]
 #input selected objects array if ith object selected, i-1th index is 1 otherwise 0 [1,1,1...0,1,0]
 #output foreground_frame_arr [number of frame][h][w][4]
-def combine_object_foreground_frame(foreground_frame_object_arr, selected_objects_arr):
-    foreground_frame_object_arr_num_frame = len(foreground_frame_object_arr[0])
-    foreground_frame_object_arr_height = len(foreground_frame_object_arr[0][0])
-    foreground_frame_object_arr_width = len(foreground_frame_object_arr[0][0][0])
-    foreground_frame_arr = [[[0,0,0,0] * foreground_frame_object_arr_width] * foreground_frame_object_arr_height] * foreground_frame_object_arr_num_frame
+def combine_object_foreground_frame(foreground_frame_object_arr, selected_objects_arr, background_frame_object_arr):
+    foreground_frame_object_arr_height = len(foreground_frame_object_arr[0])
+    foreground_frame_object_arr_width = len(foreground_frame_object_arr[0][0])
+    #foreground_frame_arr = np.zeros(foreground_frame_object_arr_num_frame，foreground_frame_object_arr_height， foreground_frame_object_arr_width， 4)
+    foreground_frame_arr = background_frame_object_arr
     for se_index in range(len(selected_objects_arr)):
         if selected_objects_arr[se_index] == 1:
-            for frame_index in range(foreground_frame_object_arr_num_frame):
                 for h_index in range(foreground_frame_object_arr_height):
                     for w_index in range(foreground_frame_object_arr_width):
-                        if foreground_frame_object_arr[se_index][frame_index][h_index][w_index][3] == 255:
-                            foreground_frame_arr[frame_index][h_index][w_index][0] = foreground_frame_object_arr[se_index][frame_index][h_index][w_index][0]
-                            foreground_frame_arr[frame_index][h_index][w_index][1] = foreground_frame_object_arr[se_index][frame_index][h_index][w_index][1]
-                            foreground_frame_arr[frame_index][h_index][w_index][2] = foreground_frame_object_arr[se_index][frame_index][h_index][w_index][2]
-                            foreground_frame_arr[frame_index][h_index][w_index][3] = 255
+                        if foreground_frame_object_arr[se_index][h_index][w_index][3] == 255:
+                            foreground_frame_arr[h_index][w_index][0] = foreground_frame_object_arr[se_index][h_index][w_index][0]
+                            foreground_frame_arr[h_index][w_index][1] = foreground_frame_object_arr[se_index][h_index][w_index][1]
+                            foreground_frame_arr[h_index][w_index][2] = foreground_frame_object_arr[se_index][h_index][w_index][2]
+                            foreground_frame_arr[h_index][w_index][3] = 255
     return foreground_frame_arr
 
 def diff_f_and_b(foreground_path, background_path):
@@ -163,14 +162,126 @@ def diff_f_and_b(foreground_path, background_path):
             else:
                 foreground_pic[h_index][w_index][3] = 255
     ker = np.ones((10,10),np.uint8)
-    foreground_pic = cv2.morphologyEx(foreground_pic, cv2.MORPH_OPEN,  ker, 2)
-    cv2.imwrite('diff.png', foreground_pic)
+    ori_foreground_pic = foreground_pic
+    foreground_pic = cv2.morphologyEx(foreground_pic, cv2.MORPH_OPEN,  ker, 1)
+    #foreground_pic = cv2.erode(foreground_pic,  ker, 1)
+    for h_index in range(video_height):
+            for w_index in range(video_width):
+                 if foreground_pic[h_index][w_index][3] == 0:
+                    ori_foreground_pic[h_index][w_index][0] = 255
+                    ori_foreground_pic[h_index][w_index][1] = 255
+                    ori_foreground_pic[h_index][w_index][2] = 255
+                    ori_foreground_pic[h_index][w_index][3] = 0
+                 else:
+                    ori_foreground_pic[h_index][w_index][3] = 255
+
+    #cv2.imwrite('../dd/diff.png', ori_foreground_pic)
+    return ori_foreground_pic
+
+def find_label_object(foreground_pic, labels):
+    for y in range (len(foreground_pic)):
+        for x in range (len(foreground_pic[0])):
+            if(foreground_pic[y][x][3] == 255):
+                count = get_zero_label(labels)
+                ret = dfs_label_object(foreground_pic, y, x, count)
+                if ret:
+                    labels[count] = 1
 
 
-def app_three_remove_object():
-       print("..")
+def dfs_label_object(foreground_pic, index_y,index_x, label):
+    is_exist = False
+    dirs = [[1,0],[0,1],[0,-1],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1]]
+    stack = collections.deque()
+    stack.append([index_y,index_x])
+    while stack:
+        y,x= stack.popleft()
+        if(y<0 or x<0 or y >= len(foreground_pic) or x>=len(foreground_pic[0]) or foreground_pic[y][x][3] != 255):
+            continue
+        foreground_pic[y][x][3] = label
+        is_exist = True
+        for dir in dirs:
+           stack.append([y+dir[0],x+dir[1]])
+    return is_exist
+
+def find_objects_on_page(prev_pic, cur_pic, labels):
+
+    for y in range (len(cur_pic)):
+            for x in range (len(cur_pic[0])):
+                if(cur_pic[y][x][3]==255 and prev_pic[y][x][3] != 0 and prev_pic[y][x][3] != 255):
+                    label = prev_pic[y][x][3]
+                    ret =  dfs_label_object(cur_pic,y,x,label)
+                    if ret:
+                        labels[label]+=1
+
+    find_label_object(cur_pic, labels)
+
+def get_zero_label(labels):
+    for i in range(1,len(labels)):
+        if labels[i] == 0:
+            return i
+    return -1
+def change_label_to_255(cur_pic, label):
+    new_pic = cur_pic.copy()
+    for y in range (len(cur_pic)):
+        for x in range (len(cur_pic[0])):
+             if cur_pic[y][x][3] == label:
+                new_pic[y][x][3] = 255
+             else:
+                new_pic[y][x][3] = 0
+    return new_pic
+
+def app_three_remove_object(foreground_p, background_p, frames_number,  selected_objects_arr):
+    video_arr = []
+    for i in range(frames_number):
+        background_path = background_p + "noobjectvideo_" + str(i) + ".png"
+        foreground_frame_arr = cv2.imread(background_path, cv2.IMREAD_UNCHANGED)
+        foreground_frame_object_arr = []
+        for j in range(len(selected_objects_arr)):
+            if(selected_objects_arr[j] == 1):
+                fore_path = foreground_p + "new_fore_" + str(j) + "_"+str(i) + ".png"
+                fore_read = cv2.imread(fore_path, cv2.IMREAD_UNCHANGED)
+                foreground_frame_object_arr.append(fore_read)
+        foreground_frame_object_arr_height = len(foreground_frame_object_arr[0])
+        foreground_frame_object_arr_width = len(foreground_frame_object_arr[0][0])
+        #foreground_frame_arr = background_frame_object_arr
+        for se_index in range(len(foreground_frame_object_arr)):
+                    for h_index in range(foreground_frame_object_arr_height):
+                        for w_index in range(foreground_frame_object_arr_width):
+                            if foreground_frame_object_arr[se_index][h_index][w_index][3] == 255:
+                                foreground_frame_arr[h_index][w_index][0] = foreground_frame_object_arr[se_index][h_index][w_index][0]
+                                foreground_frame_arr[h_index][w_index][1] = foreground_frame_object_arr[se_index][h_index][w_index][1]
+                                foreground_frame_arr[h_index][w_index][2] = foreground_frame_object_arr[se_index][h_index][w_index][2]
+                                foreground_frame_arr[h_index][w_index][3] = 255
+        video_arr.append(foreground_frame_arr)
+        convert_bgra_2_video(video_arr,30)
+
+def transfer(foreground_p, background_p,foreground_list, saveing_path):
+    new_foreground_pic = []
+    label = 0
+    labels = np.zeros(255)
+    prev = labels.copy()
+    for i in range(len(foreground_list)):
+        foreground_path = foreground_p + foreground_list[i]
+        background_path = background_p + "noobjectvideo_" + str(i) + ".png"
+        foreground_pict = diff_f_and_b(foreground_path, background_path)
+        if(i == 0):
+            find_label_object(foreground_pict, labels)
+        else:
+            find_objects_on_page(new_foreground_pic[i-1], foreground_pict, labels)
+        new_foreground_pic.append(foreground_pict)
+        for j in range(len(labels)):
+            if 0 < labels[j] < 10 and labels[j] == prev[j]:
+                labels[j] = 0
+        prev = labels.copy()
+        #cv2.imwrite(saveing_path+"new_fore"+str(i)+".png", foreground_pict)
 
 
+    for i in range(1,len(labels)):
+        if labels[i] >= 10:
+            print(i)
+            for j in range(len(foreground_list)):
+                new_pic = change_label_to_255(new_foreground_pic[j], i)
+                cv2.imwrite(saveing_path+"new_fore_"+str(i)+"_"+str(j)+".png", new_pic)
 
 if __name__ == "__main__":
     #video_path = "/Users/zihao/Documents/GitHub/remake-video-project/video_view/video2.mp4"
@@ -188,6 +299,23 @@ if __name__ == "__main__":
     test_mode = True
     read_file_of_res_run_app_two(res_path, foreground_num, fps,  height, width, path, test_mode)
     '''
-    foreground_path = "/Users/zihao/Desktop/USC/576/data/20.png"
-    background_path = "/Users/zihao/Desktop/USC/576/noobjectvideo/noobjectvideo_16.png"
-    diff_f_and_b(foreground_path, background_path)
+    foreground_p = "/Users/zihao/Desktop/USC/576/data/"
+    foreground_list = []
+    for file in os.listdir(foreground_p):
+        if file.endswith(".png"):
+            foreground_list.append(file)
+
+    foreground_list.sort()
+    background_p= "/Users/zihao/Desktop/USC/576/noobjectvideo/"
+    saveing_path = "/Users/zihao/Desktop/USC/576/dd/"
+    #find object number
+    transfer(foreground_p,background_p,foreground_list, saveing_path)
+
+    #background_list = os.listdir(background_p)
+    #background_list.sort()
+    '''
+    frames_number = len(foreground_list)
+    selected_objects_arr = [0,1]
+    app_three_remove_object(saveing_path, background_p, frames_number, selected_objects_arr)
+    '''
+
