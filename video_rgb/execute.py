@@ -9,6 +9,10 @@ from functools import partial
 
 def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, labeled_generation_mode):
     print("start", frame_idx_0)
+    jump_generated_hd_imgs = False
+    if jump_generated_hd_imgs and os.path.exists("./labeled_imgs/"+ main_folder + "/hd_background_0_"+"{:03d}".format(frame_idx_0)+".png") and os.path.exists(    "./labeled_imgs/"+ main_folder + "/hd_foreground_134_"+"{:03d}".format(frame_idx_0)+".png"):
+        print("jump existed")
+        return
     frame_idx_1 = frame_idx_0 + frame_predict_step
     if input_type == "img":
         frame_idx_0_path = png_path_prefix + "."+  "{:03d}".format(frame_idx_0 + 1) + ".png"
@@ -337,8 +341,8 @@ if __name__ == "__main__":
 
     elif input_type == "vid":
         ##############
-        video_path = "../video_view/Finaltest2_compact.mp4"
-        video_high_resolution_path = "../video_view/Finaltest2.mp4"
+        video_path = "../video_view/Stairs_compact.mp4"
+        video_high_resolution_path = "../video_view/Finaltest1.mp4"
         # video_path = "D:\\chrome downloads\\final_demo_data\\final_demo_data/test2.mp4"
         # video_path = "/Users/piaomz/Desktop/CSCI576/final_demo_data/test1.mp4"
         splitted1 = video_path.split("/")
@@ -350,7 +354,7 @@ if __name__ == "__main__":
         frame_num = len(frames)
 
 
-    if_calculate_prediction_and_output = True
+    if_calculate_prediction_and_output = False
 
     use_multiprocessing = True
 
@@ -358,7 +362,7 @@ if __name__ == "__main__":
     # "hd" generate hd
     # "c" generate compacted
     # else pass
-    labeled_generation_mode = "hd"
+    labeled_generation_mode = ""
     if labeled_generation_mode == "hd":
         all_resolution_frames, fps_dummy = convert_video_2_bgra(video_high_resolution_path)
 
@@ -408,5 +412,5 @@ if __name__ == "__main__":
         pool.map(partial(main_loop, frame_predict_step = frame_predict_step, input_type = input_type, png_path_prefix = png_path_prefix, frames = frames, resizeT_cutoutF = resizeT_cutoutF, motion_vector_storage = motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold = over_this_threshold_count_set_as_search_start_bkg_threshold, search_method = search_method, max_best_candidates_per_level = max_best_candidates_per_level, motion_difference_threshold_search_directions = motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds = motion_difference_tolerate_thresholds, main_folder = main_folder, block_size = block_size, search_expand_length=search_expand_length, if_calculate_prediction_and_output = if_calculate_prediction_and_output, all_resolution_frames = all_resolution_frames, labeled_generation_mode = labeled_generation_mode), [frame_idx_0 for frame_idx_0 in range(frame_num-frame_predict_step)])
     else:
         for frame_idx_0 in range(frame_num-frame_predict_step):
-            main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, is_generate_with_high_resolution)
+            main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, labeled_generation_mode)
 
