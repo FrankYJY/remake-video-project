@@ -6,20 +6,27 @@ from panorama import *
 import multiprocessing
 import pickle
 from functools import partial
+import math
 
-def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, labeled_generation_mode, classify_method, average_to_idx_0_each_blockT_append_all_candidatesF):
+def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, labeled_generation_mode, classify_method, average_to_idx_0_each_blockT_append_all_candidatesF, dynamic_frame_predict_step):
     print("start", frame_idx_0)
     jump_generated_hd_imgs = False
     if jump_generated_hd_imgs and os.path.exists("./labeled_imgs/"+ main_folder + "/hd_background_0_"+"{:03d}".format(frame_idx_0)+".png") and os.path.exists(    "./labeled_imgs/"+ main_folder + "/hd_foreground_134_"+"{:03d}".format(frame_idx_0)+".png"):
         print("jump existed")
         return
-    frame_idx_1 = frame_idx_0 + frame_predict_step
+    frame_idx_1 = frame_idx_0 + frame_predict_step[0]
+    print("dynamic step", frame_predict_step[0])
     if input_type == "img":
         frame_idx_0_path = png_path_prefix + "."+  "{:03d}".format(frame_idx_0 + 1) + ".png"
         frame_idx_1_path = png_path_prefix + "."+  "{:03d}".format(frame_idx_1 + 1) + ".png"
+        if not os.path.exists(png_path_prefix + "."+  "{:03d}".format(frame_idx_1 + 1) + ".png"):
+            # if dynamic, may over index
+            return
         frame_n0 = cv2.imread(frame_idx_0_path)
         frame_n1 = cv2.imread(frame_idx_1_path)
     elif input_type == "vid":
+        if frame_idx_1 >= len(frames):
+            return
         frame_n0 = frames[frame_idx_0]
         frame_n1 = frames[frame_idx_1]
 
@@ -296,6 +303,21 @@ def main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, fram
                             blocks_class_mask[cur_i][cur_j] = 4
                         else:
                             blocks_class_mask[cur_i][cur_j] = 3
+        
+        if dynamic_frame_predict_step:
+            expected_major_motion_vector_length = 8
+            expected_major_motion_vector_length_tolerance = 4
+            cur_major_motion_vector_length = 0
+            for i in range(search_start_candidate_number):
+                cur_major_motion_vector_length += math.pow(math.pow(descending_dydx_tuples[i][0], 2) + math.pow(descending_dydx_tuples[i][1], 2), 0.5)
+            cur_major_motion_vector_length /= search_start_candidate_number
+            if cur_major_motion_vector_length < expected_major_motion_vector_length - expected_major_motion_vector_length_tolerance:
+                frame_predict_step[0] += 1
+            elif cur_major_motion_vector_length > expected_major_motion_vector_length + expected_major_motion_vector_length_tolerance:
+                frame_predict_step[0] -= 1
+                frame_predict_step[0] = max(frame_predict_step[0], 1)
+            pass
+
 
 
 
@@ -496,7 +518,7 @@ if __name__ == "__main__":
     # "hd" generate hd
     # "c" generate compacted
     # else pass
-    labeled_generation_mode = "c"
+    labeled_generation_mode = "hd"
     if labeled_generation_mode == "hd":
         all_resolution_frames, fps_dummy = convert_video_2_bgra(video_high_resolution_path)
 
@@ -506,9 +528,15 @@ if __name__ == "__main__":
     # "c" for clustering
     classify_method = "s"
 
-    block_size = 12
+    block_size = 16
     search_expand_length = 16
-    frame_predict_step = 4
+
+    # only include one value, for referencial change in function
+    frame_predict_step = [4]
+
+    # if dynamic, must be single process.
+    dynamic_frame_predict_step = True
+
     max_best_candidates_per_level = 10
     # block_size = 32
     # search_expand_length = 32
@@ -518,14 +546,14 @@ if __name__ == "__main__":
                             # if lucas, frame_predict_step need to be 1
 
     # this can be decimal
-    motion_difference_tolerate_thresholds = [1, 1, 16*16*2]
-    over_this_threshold_count_set_as_search_start_bkg_threshold = 10
+    motion_difference_tolerate_thresholds = [0.7, 0.7, 16*16*1]
+    over_this_threshold_count_set_as_search_start_bkg_threshold = 30
     motion_difference_threshold_search_directions = [(1,0),(0,1),(-1,0),(0,-1)]
 
     folder_prefix = main_folder + "_" \
         + str(block_size) + "_" \
             + str(search_expand_length) + "_" \
-                + str(frame_predict_step) + "_" \
+                + str(frame_predict_step[0]) + "_" \
                     + str(max_best_candidates_per_level) + "_" \
                         + str(resizeT_cutoutF) + "_" \
                             + search_method + "_" \
@@ -546,7 +574,7 @@ if __name__ == "__main__":
     wholePanorama=np.array([])
     centerPoint=[0,0]
 
-    print("all", frame_num-frame_predict_step, "iterations")
+    print("all", frame_num-frame_predict_step[0], "iterations")
     if use_multiprocessing:
         print("using parallel processing (CPU)")
         pool = multiprocessing.Pool(processes=3)
@@ -554,8 +582,8 @@ if __name__ == "__main__":
     # for frame_idx_0 in range(frame_num-frame_predict_step):
     # for frame_idx_0 in range(0, frame_num-frame_predict_step, frame_predict_step):
         # parameters_each_iter.append([frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder])
-        pool.map(partial(main_loop, frame_predict_step = frame_predict_step, input_type = input_type, png_path_prefix = png_path_prefix, frames = frames, resizeT_cutoutF = resizeT_cutoutF, motion_vector_storage = motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold = over_this_threshold_count_set_as_search_start_bkg_threshold, search_method = search_method, max_best_candidates_per_level = max_best_candidates_per_level, motion_difference_threshold_search_directions = motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds = motion_difference_tolerate_thresholds, main_folder = main_folder, block_size = block_size, search_expand_length=search_expand_length, if_calculate_prediction_and_output = if_calculate_prediction_and_output, all_resolution_frames = all_resolution_frames, labeled_generation_mode = labeled_generation_mode, classify_method = classify_method, average_to_idx_0_each_blockT_append_all_candidatesF = average_to_idx_0_each_blockT_append_all_candidatesF), [frame_idx_0 for frame_idx_0 in range(frame_num-frame_predict_step)])
+        pool.map(partial(main_loop, frame_predict_step = frame_predict_step, input_type = input_type, png_path_prefix = png_path_prefix, frames = frames, resizeT_cutoutF = resizeT_cutoutF, motion_vector_storage = motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold = over_this_threshold_count_set_as_search_start_bkg_threshold, search_method = search_method, max_best_candidates_per_level = max_best_candidates_per_level, motion_difference_threshold_search_directions = motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds = motion_difference_tolerate_thresholds, main_folder = main_folder, block_size = block_size, search_expand_length=search_expand_length, if_calculate_prediction_and_output = if_calculate_prediction_and_output, all_resolution_frames = all_resolution_frames, labeled_generation_mode = labeled_generation_mode, classify_method = classify_method, average_to_idx_0_each_blockT_append_all_candidatesF = average_to_idx_0_each_blockT_append_all_candidatesF, dynamic_frame_predict_step = dynamic_frame_predict_step), [frame_idx_0 for frame_idx_0 in range(frame_num-frame_predict_step)])
     else:
-        for frame_idx_0 in range(frame_num-frame_predict_step):
-            main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, labeled_generation_mode, classify_method, average_to_idx_0_each_blockT_append_all_candidatesF)
+        for frame_idx_0 in range(frame_num-frame_predict_step[0]):
+            main_loop(frame_idx_0, frame_predict_step, input_type, png_path_prefix, frames, resizeT_cutoutF, motion_vector_storage, over_this_threshold_count_set_as_search_start_bkg_threshold, search_method, max_best_candidates_per_level, motion_difference_threshold_search_directions,motion_difference_tolerate_thresholds, main_folder, block_size, search_expand_length, if_calculate_prediction_and_output, all_resolution_frames, labeled_generation_mode, classify_method, average_to_idx_0_each_blockT_append_all_candidatesF, dynamic_frame_predict_step)
 
