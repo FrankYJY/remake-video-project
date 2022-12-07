@@ -362,7 +362,7 @@ def lucas_featured_search(frame_being_searched, frame_base, h, w, blockized_h, b
     # Parameters for lucas kanade optical flow
     lk_params = dict(
         winSize=(block_size, block_size),
-        maxLevel=4,
+        maxLevel=2,
         criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),
     )
     base_gray = cv2.cvtColor(frame_base, cv2.COLOR_BGR2GRAY)
