@@ -532,8 +532,8 @@ if __name__ == "__main__":
 
     elif input_type == "vid":
         ##############
-        video_path = "../video_view/Finaltest2_compact.mp4"
-        video_high_resolution_path = "../video_view/Finaltest2.mp4"
+        video_path = "../video_view/SAL_compact.mp4"
+        video_high_resolution_path = "../video_view/SAL.mp4"
         # video_path = "D:\\chrome downloads\\final_demo_data\\final_demo_data/test2.mp4"
         # video_path = "/Users/piaomz/Desktop/CSCI576/final_demo_data/test1.mp4"
         splitted1 = video_path.split("/")
@@ -588,7 +588,7 @@ if __name__ == "__main__":
                             # if lucas, frame_predict_step need to be 1
 
     # this can be decimal
-    motion_difference_tolerate_thresholds = [1, 1, 16*16*2]
+    motion_difference_tolerate_thresholds = [0.7, 0.7, 16*16*1]
     over_this_threshold_count_set_as_search_start_bkg_threshold = 20
     motion_difference_threshold_search_directions = [(1,0),(0,1),(-1,0),(0,-1)]
 
