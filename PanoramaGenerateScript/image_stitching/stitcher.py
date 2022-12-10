@@ -23,25 +23,30 @@ class ImageStitcher:
 
         self.result_image = None
         self.result_image_gray = None
+        self.foregroundimages =None
         self.alphaPano=None
 
-    def add_image(self, image: numpy.ndarray,mode=0):
+    def add_image(self, image: numpy.ndarray,mode=0,foregroundimages=None):
         '''
         this adds a new image to the stitched image by
         running feature extraction and matching them
         '''
-        assert image.ndim == 3, 'must be an image!'
+        #assert image.ndim == 3, 'must be an image!'
         # we need a alpha to get the block have foreground 
         #assert image.shape[-1] == 3, 'must be BGR!'
-        assert image.dtype == numpy.uint8, 'must be a uint8'
+        #assert image.dtype == numpy.uint8, 'must be a uint8'
 
         image_gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
         if self.result_image is None:
             self.result_image = image
             self.result_image_gray = image_gray
+            if self.foregroundimages is None:
+                if foregroundimages is not None:
+                    print("added")
+                    self.foregroundimages = foregroundimages
             return
-
+        
         # todo(will.brennan) - stop computing features on the results image each time!
         result_features = self.sift.detectAndCompute(self.result_image_gray, None)
         image_features = self.sift.detectAndCompute(image_gray, None)
@@ -60,9 +65,14 @@ class ImageStitcher:
         homography, _ = cv2.findHomography(matches_src, matches_dst, cv2.RANSAC, 5.0)
 
         logging.debug('stitching images together')
-        self.result_image = combine_images(image, self.result_image, homography,mode)
+        print("testshape")
+        print(image.shape)
+        print(foregroundimages[0][1].shape)
+        self.result_image = combine_images(image, self.result_image, homography,mode,foregroundimages=self.foregroundimages,foregroundNew=foregroundimages)
         self.result_image_gray = cv2.cvtColor(self.result_image, cv2.COLOR_RGB2GRAY)
 
+    def foreground(self):
+        return self.foregroundimages
     def image(self):
         #try to add alpha to image(lagency)
         '''class for fetching the stitched image

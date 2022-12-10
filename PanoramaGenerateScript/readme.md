@@ -2,6 +2,10 @@
 
 This algorithm is refer to the github repo https://github.com/WillBrennan/ImageStitching.
 
+## Final Result
+
+![panoramaFinal.png](panoramaFinal.png)
+
 ## Run
 
 ```bash
